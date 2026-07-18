@@ -1,0 +1,50 @@
+# TradeWatch detection ruleset
+# ------------------------------------------------------------------
+# Tune detector sensitivity here without touching code. Every value maps to a
+# field in tradewatch.config.DetectionConfig. Lower thresholds = more sensitive
+# (more alerts, more false positives); raise them to reduce noise.
+
+window:
+  max_trades: 200        # per-symbol rolling window size (count cap)
+  min_trades: 20         # warm-up: detectors stay silent until this much history
+  horizon_seconds: 300   # per-symbol rolling window size (time cap)
+
+zscore:
+  enabled: true
+  price_threshold: 3.0        # |price z-score| to alert (price only; size is
+  critical_multiplier: 1.6    # handled by volume_spike). CRITICAL beyond x this
+
+price_spike:
+  enabled: true
+  pct_threshold: 0.03         # tick-to-tick move (3%) to alert
+  critical_pct: 0.08          # 8% move -> CRITICAL
+
+volume_spike:
+  enabled: true
+  median_multiplier: 6.0      # quantity vs rolling median to alert
+  critical_multiplier: 15.0
+
+velocity:
+  enabled: true
+  window_seconds: 5.0
+  max_trades: 25              # trades/symbol in the window before alerting
+  critical_trades: 60
+
+spoofing:
+  enabled: true
+  window_seconds: 3.0
+  imbalance_ratio: 5.0        # dominant-side : other-side ratio
+  min_events: 8
+
+wash_trade:
+  enabled: true
+  window_seconds: 5.0
+  price_tolerance: 0.001      # 0.1% price band for "same price" match
+  quantity_tolerance: 0.02    # 2% size band for a matched self-cross
+
+isolation_forest:
+  enabled: true
+  train_size: 300             # samples buffered before first fit (per symbol)
+  retrain_every: 150          # retrain cadence (trades)
+  contamination: 0.02         # expected anomaly fraction
+  score_threshold: 0.62       # anomaly score in [0,1] to alert

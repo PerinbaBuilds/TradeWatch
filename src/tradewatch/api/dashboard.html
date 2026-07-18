@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TradeWatch — Real-Time Anomaly Detection</title>
+  <style>
+    :root {
+      --bg: #0b0f1a; --panel: #131a2a; --panel-2: #1a2336; --border: #26304a;
+      --text: #e6ebf5; --muted: #8b97b3; --accent: #4f8cff;
+      --low: #38bdf8; --medium: #fbbf24; --high: #f472b6; --critical: #f43f5e;
+      --ok: #34d399;
+      --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--panel);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), #7b5cff);
+      display: grid; place-items: center; font-weight: 800; font-size: 18px;
+    }
+    h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+    .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+    .dot.live { background: var(--ok); box-shadow: 0 0 0 4px rgba(52,211,153,.15); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .tile .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .tile .value { font-size: 28px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .tile .value.small { font-size: 20px; }
+    .cols { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
+    @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .card h2 { font-size: 14px; margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .badge { font-size: 11px; color: var(--muted); font-weight: 500; }
+    .feed { max-height: 620px; overflow-y: auto; }
+    .alert { display: grid; grid-template-columns: 70px 1fr auto; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); align-items: start; animation: slidein .3s ease; }
+    @keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; } }
+    .sev { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 6px; border-radius: 6px; text-align: center; height: fit-content; }
+    .sev.low { background: rgba(56,189,248,.15); color: var(--low); }
+    .sev.medium { background: rgba(251,191,36,.15); color: var(--medium); }
+    .sev.high { background: rgba(244,114,182,.15); color: var(--high); }
+    .sev.critical { background: rgba(244,63,94,.18); color: var(--critical); }
+    .alert .sym { font-weight: 700; font-family: var(--mono); }
+    .alert .reason { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+    .alert .det { font-size: 11px; color: var(--accent); font-family: var(--mono); margin-top: 4px; }
+    .alert .time { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+    .breakdown { padding: 14px 18px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+    .bar-row .name { width: 120px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+    .bar-track { flex: 1; height: 8px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #7b5cff); border-radius: 6px; transition: width .4s ease; }
+    .bar-row .count { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+    .empty { padding: 40px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+    a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">TW</div>
+      <div>
+        <h1>TradeWatch</h1>
+        <div class="sub">Real-Time Trade Anomaly Detection Engine</div>
+      </div>
+    </div>
+    <div class="status"><span id="dot" class="dot"></span><span id="conn">connecting…</span></div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <div class="tile"><div class="label">Trades Processed</div><div class="value" id="m-trades">0</div></div>
+      <div class="tile"><div class="label">Alerts Raised</div><div class="value" id="m-alerts">0</div></div>
+      <div class="tile"><div class="label">Alert Rate</div><div class="value small" id="m-rate">0.0%</div></div>
+      <div class="tile"><div class="label">Symbols</div><div class="value" id="m-symbols">0</div></div>
+      <div class="tile"><div class="label">Critical</div><div class="value" id="m-critical" style="color:var(--critical)">0</div></div>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h2>Live Anomaly Feed <span class="badge" id="feed-count">0 alerts</span></h2>
+        <div class="feed" id="feed"><div class="empty">Waiting for anomalies…</div></div>
+      </div>
+      <div class="card">
+        <h2>Detector Breakdown</h2>
+        <div class="breakdown" id="breakdown"><div class="empty">No data yet</div></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>TradeWatch · streaming over WebSocket · <a href="/stats">/stats</a> · <a href="/alerts">/alerts</a> · <a href="/health">/health</a></footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const feed = $("feed");
+    let alertCount = 0, criticalCount = 0;
+    const MAX_ROWS = 120;
+
+    function connectAlerts() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/ws/alerts`);
+      ws.onopen = () => { $("dot").className = "dot live"; $("conn").textContent = "live"; };
+      ws.onclose = () => { $("dot").className = "dot"; $("conn").textContent = "reconnecting…"; setTimeout(connectAlerts, 1500); };
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "alert") renderAlert(msg.data);
+      };
+    }
+
+    function renderAlert(a) {
+      if (feed.querySelector(".empty")) feed.innerHTML = "";
+      alertCount++;
+      if (a.severity === "critical") criticalCount++;
+      const row = document.createElement("div");
+      row.className = "alert";
+      const t = new Date(a.timestamp).toLocaleTimeString();
+      row.innerHTML = `
+        <div class="sev ${a.severity}">${a.severity}</div>
+        <div>
+          <span class="sym">${a.symbol}</span>
+          <div class="reason">${escapeHtml(a.reason)}</div>
+          <div class="det">${a.detector} · score ${a.score.toFixed(2)}</div>
+        </div>
+        <div class="time">${t}</div>`;
+      feed.insertBefore(row, feed.firstChild);
+      while (feed.children.length > MAX_ROWS) feed.removeChild(feed.lastChild);
+      $("feed-count").textContent = `${alertCount} alerts`;
+      $("m-critical").textContent = criticalCount;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    async function pollStats() {
+      try {
+        const s = await (await fetch("/stats")).json();
+        $("m-trades").textContent = s.trades_processed.toLocaleString();
+        $("m-alerts").textContent = s.alerts_raised.toLocaleString();
+        $("m-symbols").textContent = s.symbols_tracked;
+        const rate = s.trades_processed ? (100 * s.alerts_raised / s.trades_processed) : 0;
+        $("m-rate").textContent = rate.toFixed(2) + "%";
+        renderBreakdown(s.alerts_by_detector || {});
+      } catch (e) { /* ignore transient errors */ }
+    }
+
+    function renderBreakdown(byDet) {
+      const entries = Object.entries(byDet).filter(([k]) => !k.includes(":error")).sort((a, b) => b[1] - a[1]);
+      const bd = $("breakdown");
+      if (!entries.length) { bd.innerHTML = '<div class="empty">No data yet</div>'; return; }
+      const max = Math.max(...entries.map((e) => e[1]));
+      bd.innerHTML = entries.map(([name, count]) => `
+        <div class="bar-row">
+          <span class="name">${name}</span>
+          <span class="bar-track"><span class="bar-fill" style="width:${(100 * count / max).toFixed(1)}%"></span></span>
+          <span class="count">${count}</span>
+        </div>`).join("");
+    }
+
+    connectAlerts();
+    pollStats();
+    setInterval(pollStats, 2000);
+  </script>
+</body>
+</html>
