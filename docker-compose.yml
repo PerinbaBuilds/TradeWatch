@@ -73,3 +73,38 @@ services:
       kafka:
         condition: service_healthy
     restart: on-failure
+
+  # --- HDFS data lake (Hadoop) --------------------------------------------
+  # Bring up with:  docker compose --profile hadoop up
+  #   NameNode UI → http://localhost:9870
+  #   Spark & the MapReduce job read/write hdfs://namenode:9000/...
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    profiles: ["hadoop"]
+    environment:
+      CLUSTER_NAME: tradewatch
+    env_file:
+      - ./hadoop/hadoop.env
+    ports:
+      - "9870:9870"   # NameNode web UI
+      - "9000:9000"   # HDFS RPC
+    volumes:
+      - hdfs_namenode:/hadoop/dfs/name
+    restart: unless-stopped
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    profiles: ["hadoop"]
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hadoop/hadoop.env
+    volumes:
+      - hdfs_datanode:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    restart: unless-stopped
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode:

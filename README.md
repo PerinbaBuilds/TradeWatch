@@ -1,17 +1,18 @@
 # TradeWatch — Real-Time Trade Anomaly Detection Engine
 
 <p align="center">
-  <b>A Kafka → FastAPI streaming pipeline that flags market-abuse and data-quality anomalies in live trade flow — sub-10ms per event, with explainable alerts — plus an Apache Spark / PySpark scale layer for backtesting and distributed detection.</b>
+  <b>A big-data trade-surveillance stack: Apache Kafka → FastAPI for sub-10ms real-time anomaly alerts, with an Apache Spark, PySpark & Hadoop (HDFS + MapReduce) scale layer for distributed detection and backtesting over a data lake.</b>
 </p>
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="FastAPI" src="https://img.shields.io/badge/API-FastAPI-009688">
   <img alt="Apache Kafka" src="https://img.shields.io/badge/streaming-Apache%20Kafka-231F20">
-  <img alt="Apache Spark" src="https://img.shields.io/badge/scale-Apache%20Spark%20%2F%20PySpark-E25A1C">
+  <img alt="Apache Spark" src="https://img.shields.io/badge/compute-Apache%20Spark%20%2F%20PySpark-E25A1C">
+  <img alt="Apache Hadoop" src="https://img.shields.io/badge/data%20lake-Hadoop%20HDFS%20%2F%20MapReduce-66CCFF">
   <img alt="scikit-learn" src="https://img.shields.io/badge/ML-scikit--learn-F7931E">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-36%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-39%20passing-brightgreen">
 </p>
 
 ---
@@ -25,14 +26,15 @@ before they cause losses. Off-the-shelf surveillance suites are expensive,
 opaque black boxes.
 
 **TradeWatch** is a compact, transparent surveillance stack built around a
-**Lambda-style architecture**:
+**Lambda-style big-data architecture**:
 
 - a **speed layer** — an **Apache Kafka → FastAPI** pipeline whose engine scores
   every trade against statistical, behavioural and ML detectors and emits
-  **structured, explainable alerts** in **sub-10ms**; and
-- a **scale layer** — **Apache Spark / PySpark** jobs that run the same detection
-  logic over historical Parquet (backtesting, threshold tuning, baseline
-  bootstrapping) and as distributed **Structured Streaming** over Kafka.
+  **structured, explainable alerts** in **sub-10ms**;
+- a **batch/scale layer** — **Apache Spark / PySpark** jobs and a **Hadoop
+  MapReduce** job that run the same detection logic over a **Hadoop HDFS data
+  lake** (backtesting, threshold tuning, baseline bootstrapping) and as
+  distributed **Structured Streaming** over Kafka.
 
 The detection core is embeddable too — drop it in any Python process.
 
@@ -50,6 +52,7 @@ The detection core is embeddable too — drop it in any Python process.
 - 🔕 **Alert deduplication** — per-(symbol, detector) cooldown collapses a noisy episode into one actionable alert (à la PagerDuty grouping).
 - 🟥 **Apache Kafka ingestion** — consume the production trade tape from a Kafka topic; a bundled producer + broker make it one command to demo end-to-end.
 - 🔶 **Apache Spark / PySpark scale layer** — the same rules as Spark SQL window functions: a **batch backtest** over historical Parquet and a **Structured Streaming** Kafka job.
+- 🔵 **Hadoop big-data layer** — **HDFS** as the data lake and a **MapReduce** (Streaming) job for massive batch anomaly scans; the mapper/reducer are CI-tested via the same pipe Hadoop runs.
 - 🔌 **Integrate anywhere** — REST (`POST /trades`), WebSocket stream, embedded Python API, or a Kafka consumer.
 - 📊 **Live dashboard** — zero-dependency WebSocket UI, served by the app itself.
 - 🧪 **Measured, not hand-wavy** — a labelled simulator + `tradewatch evaluate` / `tradewatch bench` give you precision/recall/F1 and latency as CI gates.
@@ -74,26 +77,36 @@ flowchart TB
         ENG --> API
     end
 
-    subgraph SCALE[Scale layer — Apache Spark / PySpark]
+    HDFS[(Hadoop HDFS<br/>data lake)]
+
+    subgraph SCALE[Batch / scale layer]
         direction TB
-        SS[Structured Streaming<br/>windowed detection over Kafka]
-        BB[Batch backtest<br/>historical Parquet at scale]
+        SS[Spark Structured Streaming<br/>windowed detection]
+        BB[Spark batch backtest<br/>Spark SQL windows]
+        MR[Hadoop MapReduce<br/>Streaming mapper/reducer]
     end
 
     KAFKA --> ENG
     REST[REST POST /trades] --> ENG
     KAFKA --> SS
-    BB -. baselines & tuned thresholds .-> ENG
+    KAFKA -. archive .-> HDFS
+    HDFS --> BB
+    HDFS --> MR
+    BB & MR -. baselines & tuned thresholds .-> ENG
 
     API --> OUT[/Alerts: dashboard · JSONL audit · Slack / SIEM / Kafka/]
     SS --> OUT
+    BB --> HDFS
+    MR --> HDFS
 
     classDef k fill:#231F20,stroke:#555,color:#fff;
     classDef speed fill:#0f766e,stroke:#14b8a6,color:#ecfeff;
     classDef scale fill:#E25A1C,stroke:#f59e6b,color:#fff;
+    classDef lake fill:#0369a1,stroke:#38bdf8,color:#f0f9ff;
     class KAFKA k;
     class ENG,API speed;
-    class SS,BB scale;
+    class SS,BB,MR scale;
+    class HDFS lake;
 ```
 
 **Pluggable by design.** A `TradeSource` produces trades; the `DetectionEngine`
@@ -112,7 +125,8 @@ Forest (see [Detectors](#detectors)).
 | Ingestion | **Apache Kafka** (`aiokafka`) | Consume the production trade tape; decouple producers from detection |
 | Real-time engine | **Python 3.10+**, **scikit-learn** | Event-time windows + 7 detectors incl. online Isolation Forest |
 | Service / API | **FastAPI**, **Uvicorn**, WebSocket | REST decisioning, live streams, dashboard |
-| Scale / batch | **Apache Spark**, **PySpark** | Structured Streaming + historical backtesting with Spark SQL |
+| Distributed compute | **Apache Spark**, **PySpark** | Structured Streaming + historical backtesting with Spark SQL |
+| Data lake + batch | **Apache Hadoop** (HDFS + MapReduce) | Durable storage & massive batch anomaly scans (Streaming job) |
 | Config / validation | **Pydantic v2**, YAML | Typed models, 12-factor settings, tunable rules |
 | Delivery | **Docker**, **docker-compose**, **GitHub Actions** | Containerised stacks + CI quality gates |
 
@@ -186,6 +200,27 @@ spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
 
 The batch job prints a per-detector breakdown and writes flagged anomalies to
 Parquet; see [`spark/`](spark/).
+
+### Run the Hadoop (HDFS + MapReduce) big-data layer
+
+The MapReduce job runs the same statistical detection as a Hadoop Streaming
+mapper/reducer. `mapper | sort | reducer` is exactly what the cluster executes,
+so you can run it locally with no Hadoop install:
+
+```bash
+python examples/generate_history.py --out data/trades.jsonl --format json --trades 100000
+hadoop/run_local.sh data/trades.jsonl          # → symbol, detector, price, qty, score
+```
+
+On a real cluster it reads and writes the **HDFS data lake** (bring one up with
+`docker compose --profile hadoop up`, NameNode UI at http://localhost:9870):
+
+```bash
+hdfs dfs -put data/trades.jsonl /tradewatch/trades/
+hadoop/run_streaming.sh /tradewatch/trades /tradewatch/anomalies
+```
+
+Spark reads the same HDFS paths (`hdfs://namenode:9000/...`). See [`hadoop/`](hadoop/).
 
 ---
 
@@ -376,7 +411,7 @@ TRADEWATCH_SIMULATOR_TRADES_PER_SECOND=25
 
 ```bash
 make dev       # install with dev + kafka + spark extras
-make test      # pytest (36 tests)
+make test      # pytest (39 tests)
 make lint      # ruff
 make evaluate  # precision/recall report
 make run       # serve the dashboard
@@ -402,6 +437,10 @@ spark/               # Apache Spark / PySpark scale layer
 ├── detection_sql.py # detectors as Spark SQL window functions
 ├── batch_backtest.py# historical Parquet backtest
 └── streaming_job.py # Structured Streaming over Kafka
+hadoop/              # Hadoop big-data layer (HDFS + MapReduce)
+├── mapper.py        # Hadoop Streaming mapper (symbol-keyed)
+├── reducer.py       # per-symbol z-score / volume MapReduce detection
+└── run_local.sh     # run the job with Unix pipes (no cluster needed)
 examples/            # embedded, HTTP, Kafka producer, history generator
 ```
 

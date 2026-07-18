@@ -13,13 +13,21 @@ At the system level this forms a **Lambda-style architecture**:
 - **Speed layer** — Apache Kafka → the FastAPI-hosted `DetectionEngine`, deciding
   each trade in sub-10ms and streaming alerts to the dashboard/sinks. This is the
   code under `src/tradewatch/`.
-- **Scale layer** — Apache Spark / PySpark jobs under `spark/` that express the
-  same statistical detectors as Spark SQL window functions, for backtesting
-  thresholds over historical Parquet and for distributed Structured Streaming
-  over the same Kafka topic. Baselines learned here can seed the live engine.
+- **Batch / scale layer** — distributed jobs that apply the same statistical
+  detectors over large, at-rest data:
+  - **Apache Spark / PySpark** (`spark/`) — detectors as Spark SQL window
+    functions, for backtesting thresholds over historical Parquet and for
+    distributed Structured Streaming over the same Kafka topic.
+  - **Apache Hadoop** (`hadoop/`) — **HDFS** as the durable data lake and a
+    **MapReduce** (Streaming) job for massive batch anomaly scans. The
+    mapper emits symbol-keyed records; the reducer does per-symbol z-score /
+    volume detection. Spark and MapReduce read/write the same `hdfs://` paths.
 
-Both layers read the identical trade schema (`spark/detection_sql.py` mirrors
-`tradewatch.models.Trade`) and apply the same rules, so offline and online agree.
+  Baselines learned here can seed the live engine.
+
+All layers read the identical trade schema (`spark/detection_sql.py` and the
+Hadoop mapper mirror `tradewatch.models.Trade`) and apply the same rules, so
+offline and online agree.
 
 ## Data flow
 

@@ -11,7 +11,6 @@ htmlcov
 .coverage
 tests
 docs
-examples
 *.jsonl
 .env
 .DS_Store

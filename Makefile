@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run simulate evaluate bench kafka docker clean
+.PHONY: help install dev test lint fmt run simulate evaluate bench kafka hadoop docker clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -15,6 +15,10 @@ bench: ## Measure per-event latency and throughput
 
 kafka: ## Run the full Kafka -> FastAPI pipeline (broker + producer + consumer)
 	docker compose --profile kafka up --build
+
+hadoop: ## Run the Hadoop MapReduce job locally (generates data if needed)
+	@test -f data/trades.jsonl || python examples/generate_history.py --out data/trades.jsonl --format json --trades 100000
+	bash hadoop/run_local.sh data/trades.jsonl | head -20
 
 test: ## Run the test suite
 	pytest

@@ -21,6 +21,7 @@ RUN useradd --create-home --uid 10001 appuser
 
 COPY --from=build /install /usr/local
 COPY config ./config
+COPY examples ./examples
 
 USER appuser
 EXPOSE 8000
