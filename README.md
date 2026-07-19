@@ -15,6 +15,14 @@
   <img alt="Tests" src="https://img.shields.io/badge/tests-39%20passing-brightgreen">
 </p>
 
+<p align="center">
+  <b>Big-data stack at a glance</b><br/>
+  <code>Apache Kafka</code> ➜ <code>FastAPI engine</code> &nbsp;<i>speed layer · sub-10ms/event</i><br/>
+  <code>Hadoop HDFS</code> ➜ <code>Apache Spark</code> + <code>Hadoop MapReduce</code> &nbsp;<i>scale layer · backtest &amp; distributed detection</i>
+</p>
+
+📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md)
+
 ---
 
 ## Why this exists
