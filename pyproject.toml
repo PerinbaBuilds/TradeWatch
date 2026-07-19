@@ -41,8 +41,8 @@ dev = [
 tradewatch = "tradewatch.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/PerinbaBuilds/real-time-trade-anomaly-detection-engine"
-Repository = "https://github.com/PerinbaBuilds/real-time-trade-anomaly-detection-engine"
+Homepage = "https://github.com/PerinbaBuilds/TradeWatch"
+Repository = "https://github.com/PerinbaBuilds/TradeWatch"
 
 [tool.setuptools.packages.find]
 where = ["src"]
