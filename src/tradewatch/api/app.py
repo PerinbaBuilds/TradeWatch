@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..config import DetectionConfig, Settings
 from ..engine import DetectionEngine
+from ..metrics import MetricsCollector
 from ..models import Alert, Trade
 from ..pipeline import Pipeline
 from ..sinks import Broadcaster, WebSocketSink
@@ -46,6 +48,7 @@ class AppState:
         self.config = DetectionConfig.load(settings.rules_path)
         self.engine = DetectionEngine(self.config)
         self.broadcaster = Broadcaster(history=settings.alert_buffer_size)
+        self.metrics = MetricsCollector()
         self.pipeline: Pipeline | None = None
         self._task: asyncio.Task | None = None
 
@@ -72,6 +75,7 @@ class AppState:
             engine=self.engine,
             sinks=[WebSocketSink(self.broadcaster)],
             on_trade=self.broadcaster.publish_trade,
+            on_processed=self.metrics.record,
         )
         self._task = asyncio.create_task(self.pipeline.run())
         logger.info("background pipeline started from %s", label)
@@ -140,6 +144,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         data = app.state.tw.broadcaster.recent_alerts(limit=limit)
         return JSONResponse(data)
 
+    @app.get("/api/metrics")
+    async def api_metrics(window: int = 120) -> JSONResponse:
+        """Consolidated snapshot powering the analytics dashboard."""
+        state: AppState = app.state.tw
+        snap = state.metrics.snapshot(ts_window=window)
+        snap["engine"] = state.engine.stats()
+        snap["source"] = state.settings.source
+        snap["pipeline_running"] = bool(state.pipeline and state.pipeline.running)
+        return JSONResponse(snap)
+
     @app.post("/trades")
     async def ingest_trade(trade: Trade) -> dict:
         """Ingest a single trade synchronously and return any alerts.
@@ -149,7 +163,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """
         state: AppState = app.state.tw
         state.broadcaster.publish_trade(trade)
+        start = time.perf_counter_ns()
         raised: list[Alert] = state.engine.process(trade)
+        latency_us = (time.perf_counter_ns() - start) / 1000.0
+        state.metrics.record(trade, raised, latency_us)
         for alert in raised:
             state.broadcaster.publish_alert(alert)
         return {

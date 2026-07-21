@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 
 from .engine import DetectionEngine
@@ -28,11 +29,14 @@ class Pipeline:
         engine: DetectionEngine,
         sinks: list[AlertSink] | None = None,
         on_trade: Callable[[Trade], None] | Callable[[Trade], Awaitable[None]] | None = None,
+        on_processed: Callable[[Trade, list[Alert], float], None] | None = None,
     ) -> None:
         self.source = source
         self.engine = engine
         self.sinks = sinks or []
         self.on_trade = on_trade
+        # Called after each trade with (trade, alerts, latency_us) — powers metrics.
+        self.on_processed = on_processed
         self._running = False
 
     async def run(self) -> None:
@@ -55,7 +59,16 @@ class Pipeline:
             if asyncio.iscoroutine(result):
                 await result
 
+        start = time.perf_counter_ns()
         alerts = self.engine.process(trade)
+        latency_us = (time.perf_counter_ns() - start) / 1000.0
+
+        if self.on_processed is not None:
+            try:
+                self.on_processed(trade, alerts, latency_us)
+            except Exception:  # metrics must never stall ingestion
+                logger.exception("on_processed hook failed")
+
         for alert in alerts:
             await self._dispatch(trade, alert)
 

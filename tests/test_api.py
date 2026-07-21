@@ -26,6 +26,18 @@ def test_config_endpoint_exposes_rules():
         assert cfg["zscore"]["price_threshold"] > 0
 
 
+def test_metrics_endpoint_shape():
+    with _client() as client:
+        # Warm up so the snapshot has content.
+        for i in range(30):
+            client.post("/trades", json={"symbol": "AAPL", "price": 100 + (i % 3), "quantity": 10})
+        m = client.get("/api/metrics").json()
+        for key in ("kpis", "timeseries", "latency", "by_detector", "by_severity", "symbols", "engine"):
+            assert key in m
+        assert m["kpis"]["total_trades"] == 30
+        assert m["source"] == "simulator"
+
+
 def test_post_trade_returns_decision():
     with _client() as client:
         resp = client.post("/trades", json={"symbol": "AAPL", "price": 100.0, "quantity": 10.0})

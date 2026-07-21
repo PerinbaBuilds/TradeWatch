@@ -3,174 +3,794 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TradeWatch — Real-Time Anomaly Detection</title>
+  <title>TradeWatch — Surveillance Console</title>
   <style>
     :root {
-      --bg: #0b0f1a; --panel: #131a2a; --panel-2: #1a2336; --border: #26304a;
-      --text: #e6ebf5; --muted: #8b97b3; --accent: #4f8cff;
-      --low: #38bdf8; --medium: #fbbf24; --high: #f472b6; --critical: #f43f5e;
-      --ok: #34d399;
-      --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
-      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color-scheme: dark;
+      --plane: #0b0d10;
+      --surface: #12151b;
+      --surface-2: #171b22;
+      --surface-3: #1d222b;
+      --border: #242a34;
+      --border-soft: #1c212a;
+      --text: #f2f4f8;
+      --text-2: #aeb6c2;
+      --muted: #6b7686;
+      --grid: #1e242e;
+      --accent: #3987e5;
+      --accent-2: #7c5cff;
+      /* severity → status palette (always paired with a label) */
+      --sev-low: #4c9be8;
+      --sev-medium: #f5b73d;
+      --sev-high: #ef8a5a;
+      --sev-critical: #e5484d;
+      --good: #2ea043;
+      --mono: "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+      --sans: -apple-system, system-ui, "Segoe UI", Roboto, Inter, sans-serif;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.18);
+      --r: 12px;
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --plane: #f4f5f7; --surface: #ffffff; --surface-2: #f7f8fa; --surface-3: #eef1f5;
+      --border: #e3e7ec; --border-soft: #edeff3;
+      --text: #0c0f14; --text-2: #4a5361; --muted: #8b94a3; --grid: #edf0f4;
+      --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
-    header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--panel);
-      position: sticky; top: 0; z-index: 10;
-    }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      width: 34px; height: 34px; border-radius: 9px;
-      background: linear-gradient(135deg, var(--accent), #7b5cff);
-      display: grid; place-items: center; font-weight: 800; font-size: 18px;
-    }
-    h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
-    .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-    .dot.live { background: var(--ok); box-shadow: 0 0 0 4px rgba(52,211,153,.15); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
-    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 22px; }
-    .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
-    .tile .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
-    .tile .value { font-size: 28px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
-    .tile .value.small { font-size: 20px; }
-    .cols { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
-    @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-    .card h2 { font-size: 14px; margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .badge { font-size: 11px; color: var(--muted); font-weight: 500; }
-    .feed { max-height: 620px; overflow-y: auto; }
-    .alert { display: grid; grid-template-columns: 70px 1fr auto; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); align-items: start; animation: slidein .3s ease; }
-    @keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; } }
-    .sev { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 6px; border-radius: 6px; text-align: center; height: fit-content; }
-    .sev.low { background: rgba(56,189,248,.15); color: var(--low); }
-    .sev.medium { background: rgba(251,191,36,.15); color: var(--medium); }
-    .sev.high { background: rgba(244,114,182,.15); color: var(--high); }
-    .sev.critical { background: rgba(244,63,94,.18); color: var(--critical); }
-    .alert .sym { font-weight: 700; font-family: var(--mono); }
-    .alert .reason { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
-    .alert .det { font-size: 11px; color: var(--accent); font-family: var(--mono); margin-top: 4px; }
-    .alert .time { font-size: 11px; color: var(--muted); font-family: var(--mono); }
-    .breakdown { padding: 14px 18px; }
-    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
-    .bar-row .name { width: 120px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
-    .bar-track { flex: 1; height: 8px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
-    .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #7b5cff); border-radius: 6px; transition: width .4s ease; }
-    .bar-row .count { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
-    .empty { padding: 40px 18px; text-align: center; color: var(--muted); font-size: 13px; }
-    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--plane); color: var(--text); font-family: var(--sans);
+      font-size: 14px; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* ---------- shell ---------- */
+    .app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+    aside { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 18px 18px 16px; }
+    .brand .logo { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 800; font-size: 15px;
+      box-shadow: 0 4px 14px rgba(57,135,229,.4); }
+    .brand h1 { font-size: 15px; margin: 0; letter-spacing: .2px; font-weight: 700; }
+    .brand .tag { font-size: 10.5px; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; }
+    nav { padding: 6px 10px; overflow-y: auto; flex: 1; }
+    .nav-sec { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
+      padding: 14px 10px 6px; font-weight: 600; }
+    .nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 9px;
+      color: var(--text-2); cursor: pointer; font-weight: 500; margin-bottom: 1px; transition: background .12s, color .12s; }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+    .nav-item.active svg { color: var(--accent); }
+    .nav-item svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
+    .nav-item .badge { margin-left: auto; font-size: 10px; background: var(--sev-critical); color: #fff;
+      border-radius: 20px; padding: 1px 7px; font-variant-numeric: tabular-nums; font-weight: 700; }
+    .side-foot { padding: 12px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+    .side-foot .row { display: flex; justify-content: space-between; margin: 3px 0; }
+
+    main { min-width: 0; display: flex; flex-direction: column; height: 100vh; }
+    header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 20; }
+    header .pt { font-size: 17px; font-weight: 700; }
+    header .pt small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; margin-top: 1px; }
+    header .spacer { flex: 1; }
+    .pill { display: inline-flex; align-items: center; gap: 7px; background: var(--surface-2); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 20px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .pill b { color: var(--text); font-weight: 650; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.live { background: var(--good); box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 22%, transparent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .icon-btn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text-2); display: grid; place-items: center; cursor: pointer; }
+    .icon-btn:hover { color: var(--text); border-color: var(--muted); }
+    .icon-btn svg { width: 16px; height: 16px; }
+
+    .content { padding: 22px 24px 40px; overflow-y: auto; flex: 1; }
+    .page { display: none; animation: fade .25s ease; }
+    .page.active { display: block; }
+    @keyframes fade { from{opacity:0; transform:translateY(4px)} to{opacity:1} }
+
+    /* ---------- grid + cards ---------- */
+    .grid { display: grid; gap: 16px; }
+    .kpis { grid-template-columns: repeat(auto-fit, minmax(184px,1fr)); margin-bottom: 18px; }
+    .cols-2 { grid-template-columns: 1.55fr 1fr; }
+    .cols-2b { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 1080px){ .cols-2,.cols-2b,.cols-3{ grid-template-columns: 1fr; } }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); }
+    .card > .hd { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border-soft); }
+    .card > .hd h3 { font-size: 13.5px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+    .card > .hd .sub { font-size: 11.5px; color: var(--muted); }
+    .card > .hd .r { margin-left: auto; }
+    .card > .bd { padding: 16px 18px; }
+
+    .kpi { padding: 16px 18px; }
+    .kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; display:flex; align-items:center; gap:7px; }
+    .kpi .label svg { width: 14px; height: 14px; }
+    .kpi .value { font-size: 27px; font-weight: 720; margin-top: 8px; line-height: 1; letter-spacing: -.5px; }
+    .kpi .value.sm { font-size: 21px; }
+    .kpi .foot { font-size: 11.5px; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+    .delta { font-weight: 650; } .delta.up { color: var(--good); } .delta.down { color: var(--sev-critical); }
+
+    canvas { display: block; width: 100%; }
+    .chart-wrap { position: relative; }
+    .chart-tip { position: absolute; pointer-events: none; background: var(--surface-3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; font-size: 12px; color: var(--text); box-shadow: var(--shadow); opacity: 0;
+      transition: opacity .1s; transform: translate(-50%, -115%); white-space: nowrap; z-index: 5; font-variant-numeric: tabular-nums; }
+    .chart-tip .k { color: var(--muted); }
+
+    /* ---------- legend ---------- */
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; }
+    .legend .li { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); }
+    .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* ---------- tables ---------- */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+      font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; background: var(--surface); }
+    th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border-soft); color: var(--text-2); }
+    tr:hover td { background: var(--surface-2); }
+    td .sym { color: var(--text); font-weight: 650; font-family: var(--mono); }
+    .table-scroll { max-height: 560px; overflow-y: auto; }
+
+    .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .4px; padding: 3px 8px; border-radius: 6px; }
+    .chip.low { background: color-mix(in srgb, var(--sev-low) 18%, transparent); color: var(--sev-low); }
+    .chip.medium { background: color-mix(in srgb, var(--sev-medium) 20%, transparent); color: var(--sev-medium); }
+    .chip.high { background: color-mix(in srgb, var(--sev-high) 20%, transparent); color: var(--sev-high); }
+    .chip.critical { background: color-mix(in srgb, var(--sev-critical) 22%, transparent); color: var(--sev-critical); }
+    .up { color: var(--good); } .down { color: var(--sev-critical); }
+
+    /* live feed */
+    .feed { max-height: 640px; overflow-y: auto; }
+    .feed-row { display: grid; grid-template-columns: 78px 1fr auto; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border-soft);
+      align-items: start; animation: slide .28s ease; }
+    @keyframes slide { from{opacity:0; transform: translateX(-6px)} to{opacity:1} }
+    .feed-row .reason { font-size: 12.5px; color: var(--text-2); margin-top: 3px; line-height: 1.45; }
+    .feed-row .meta { font-size: 11px; color: var(--accent); font-family: var(--mono); margin-top: 4px; }
+    .feed-row .t { font-size: 11px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filters button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); padding: 5px 11px;
+      border-radius: 8px; font-size: 12px; cursor: pointer; font-weight: 550; }
+    .filters button.on { background: color-mix(in srgb,var(--accent) 18%, transparent); color: var(--text); border-color: color-mix(in srgb,var(--accent) 40%, transparent); }
+
+    .det-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
+    .det-card { border: 1px solid var(--border); border-radius: 10px; padding: 15px 16px; background: var(--surface-2); }
+    .det-card .top { display: flex; align-items: center; gap: 10px; }
+    .det-card .nm { font-weight: 650; font-family: var(--mono); font-size: 13px; }
+    .det-card .ct { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 16px; }
+    .det-card p { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 10px 0 0; }
+    .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; font-size: 13px; }
+    .kv .k { color: var(--muted); } .kv .v { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+    .rule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 14px; }
+    .empty { padding: 44px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+    .barlist { display: flex; flex-direction: column; gap: 11px; }
+    .barlist .row { display: grid; grid-template-columns: 130px 1fr 46px; gap: 12px; align-items: center; font-size: 12.5px; }
+    .barlist .nm { color: var(--text-2); font-family: var(--mono); font-size: 12px; }
+    .barlist .track { height: 10px; background: var(--surface-3); border-radius: 6px; overflow: hidden; }
+    .barlist .fill { height: 100%; border-radius: 6px; transition: width .5s ease; min-width: 4px; }
+    .barlist .ct { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <div class="logo">TW</div>
-      <div>
-        <h1>TradeWatch</h1>
-        <div class="sub">Real-Time Trade Anomaly Detection Engine</div>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        <div class="logo">TW</div>
+        <div>
+          <h1>TradeWatch</h1>
+          <div class="tag">Surveillance Console</div>
+        </div>
       </div>
-    </div>
-    <div class="status"><span id="dot" class="dot"></span><span id="conn">connecting…</span></div>
-  </header>
-
-  <main>
-    <div class="grid">
-      <div class="tile"><div class="label">Trades Processed</div><div class="value" id="m-trades">0</div></div>
-      <div class="tile"><div class="label">Alerts Raised</div><div class="value" id="m-alerts">0</div></div>
-      <div class="tile"><div class="label">Alert Rate</div><div class="value small" id="m-rate">0.0%</div></div>
-      <div class="tile"><div class="label">Symbols</div><div class="value" id="m-symbols">0</div></div>
-      <div class="tile"><div class="label">Critical</div><div class="value" id="m-critical" style="color:var(--critical)">0</div></div>
-    </div>
-
-    <div class="cols">
-      <div class="card">
-        <h2>Live Anomaly Feed <span class="badge" id="feed-count">0 alerts</span></h2>
-        <div class="feed" id="feed"><div class="empty">Waiting for anomalies…</div></div>
+      <nav id="nav"></nav>
+      <div class="side-foot">
+        <div class="row"><span>Source</span><b id="sf-source">—</b></div>
+        <div class="row"><span>Uptime</span><b id="sf-uptime">—</b></div>
+        <div class="row"><span>Engine p99</span><b id="sf-p99">—</b></div>
       </div>
-      <div class="card">
-        <h2>Detector Breakdown</h2>
-        <div class="breakdown" id="breakdown"><div class="empty">No data yet</div></div>
-      </div>
-    </div>
-  </main>
+    </aside>
 
-  <footer>TradeWatch · streaming over WebSocket · <a href="/stats">/stats</a> · <a href="/alerts">/alerts</a> · <a href="/health">/health</a></footer>
+    <main>
+      <header>
+        <div class="pt"><span id="page-title">Overview</span><small id="page-sub">Real-time surveillance at a glance</small></div>
+        <div class="spacer"></div>
+        <span class="pill"><span id="conn-dot" class="dot"></span><span id="conn-txt">connecting</span></span>
+        <span class="pill">▲ <b id="hp-tps">0</b>/s trades</span>
+        <span class="pill" style="color:var(--sev-high)">⚑ <b id="hp-aps">0</b>/s alerts</span>
+        <span class="pill" id="hp-clock" style="font-family:var(--mono)">--:--:--</span>
+        <button class="icon-btn" id="theme-btn" title="Toggle theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+      </header>
+
+      <div class="content">
+        <!-- KPI row (shared) -->
+        <div class="grid kpis" id="kpis"></div>
+
+        <!-- OVERVIEW -->
+        <section class="page active" id="page-overview">
+          <div class="grid cols-2" style="margin-bottom:16px">
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Trade Throughput</h3><span class="sub">trades / second · last 2 min</span></div>
+              <div class="bd"><canvas id="c-throughput" height="220"></canvas></div>
+            </div>
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Alert Severity Mix</h3><span class="sub">cumulative</span></div>
+              <div class="bd" style="display:flex; gap:18px; align-items:center;">
+                <canvas id="c-sevdonut" width="180" height="180" style="width:180px;flex:none"></canvas>
+                <div id="sev-legend" class="legend" style="flex-direction:column"></div>
+              </div>
+            </div>
+          </div>
+          <div class="grid cols-2">
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Alert Rate</h3><span class="sub">alerts / second · last 2 min</span></div>
+              <div class="bd"><canvas id="c-alertrate" height="200"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="hd"><h3>Detector Activity</h3><span class="sub">alerts by detector</span></div>
+              <div class="bd"><div id="ov-detectors" class="barlist"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- LIVE FEED -->
+        <section class="page" id="page-feed">
+          <div class="grid cols-2">
+            <div class="card">
+              <div class="hd"><h3>Live Anomaly Feed</h3><span class="sub" id="feed-count">0 alerts</span>
+                <div class="r filters" id="feed-filters">
+                  <button data-sev="all" class="on">All</button>
+                  <button data-sev="critical">Critical</button>
+                  <button data-sev="high">High</button>
+                  <button data-sev="medium">Medium</button>
+                  <button data-sev="low">Low</button>
+                </div>
+              </div>
+              <div class="feed" id="feed"><div class="empty">Waiting for anomalies…</div></div>
+            </div>
+            <div class="card">
+              <div class="hd"><h3>Trade Tape</h3><span class="sub">most recent executions</span></div>
+              <div class="table-scroll">
+                <table><thead><tr><th>Symbol</th><th class="num">Price</th><th class="num">Qty</th><th>Side</th><th class="num">Notional</th></tr></thead>
+                <tbody id="tape-body"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ANALYTICS -->
+        <section class="page" id="page-analytics">
+          <div class="card chart-wrap" style="margin-bottom:16px">
+            <div class="hd"><h3>Trades vs Alerts</h3><span class="sub">per second · last 2 min</span>
+              <div class="r legend"><span class="li"><span class="sw" style="background:var(--accent)"></span>Trades</span><span class="li"><span class="sw" style="background:var(--sev-high)"></span>Alerts</span></div></div>
+            <div class="bd"><canvas id="c-combo" height="240"></canvas></div>
+          </div>
+          <div class="grid cols-2b">
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Notional Flow</h3><span class="sub">traded value / second ($)</span></div>
+              <div class="bd"><canvas id="c-notional" height="210"></canvas></div>
+            </div>
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Cumulative Alerts</h3><span class="sub">total anomalies over time</span></div>
+              <div class="bd"><canvas id="c-cumalerts" height="210"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SYMBOLS -->
+        <section class="page" id="page-symbols">
+          <div class="card">
+            <div class="hd"><h3>Instruments</h3><span class="sub" id="sym-count">0 symbols tracked</span></div>
+            <div class="table-scroll">
+              <table><thead><tr>
+                <th>Symbol</th><th class="num">Last</th><th class="num">Change</th><th>Trend</th>
+                <th class="num">Trades</th><th>Buy/Sell</th><th class="num">Alerts</th><th class="num">Notional</th>
+              </tr></thead><tbody id="sym-body"></tbody></table>
+            </div>
+          </div>
+        </section>
+
+        <!-- DETECTORS -->
+        <section class="page" id="page-detectors">
+          <div class="grid cols-2" style="margin-bottom:16px">
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Detector Share</h3><span class="sub">proportion of alerts raised</span></div>
+              <div class="bd" style="display:flex;gap:18px;align-items:center">
+                <canvas id="c-detdonut" width="180" height="180" style="width:180px;flex:none"></canvas>
+                <div id="det-legend" class="legend" style="flex-direction:column"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="hd"><h3>Alert Volume by Detector</h3></div>
+              <div class="bd"><div id="det-bars" class="barlist"></div></div>
+            </div>
+          </div>
+          <div class="card"><div class="hd"><h3>Detection Methods</h3><span class="sub">7 detectors covering market-abuse &amp; data-quality</span></div>
+            <div class="bd"><div class="det-grid" id="det-cards"></div></div>
+          </div>
+        </section>
+
+        <!-- PERFORMANCE -->
+        <section class="page" id="page-perf">
+          <div class="grid cols-3" style="margin-bottom:16px" id="perf-kpis"></div>
+          <div class="grid cols-2">
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Per-Event Latency Distribution</h3><span class="sub">engine.process() · microseconds</span></div>
+              <div class="bd"><canvas id="c-lat" height="240"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="hd"><h3>Throughput &amp; Health</h3></div>
+              <div class="bd"><div class="kv" id="perf-kv"></div>
+                <div style="margin-top:16px" class="chart-wrap"><canvas id="c-perftput" height="150"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- RULES -->
+        <section class="page" id="page-rules">
+          <div class="card"><div class="hd"><h3>Detection Ruleset</h3><span class="sub">config/detection_rules.yaml (live)</span></div>
+            <div class="bd"><div class="rule-grid" id="rules"></div></div></div>
+        </section>
+
+        <!-- SYSTEM -->
+        <section class="page" id="page-system">
+          <div class="grid cols-2b">
+            <div class="card"><div class="hd"><h3>Engine</h3></div><div class="bd"><div class="kv" id="sys-engine"></div></div></div>
+            <div class="card"><div class="hd"><h3>API Endpoints</h3></div><div class="bd">
+              <div class="kv" style="grid-template-columns:auto 1fr">
+                <span class="k">GET</span><span class="v" style="text-align:left"><a href="/health">/health</a></span>
+                <span class="k">GET</span><span class="v" style="text-align:left"><a href="/stats">/stats</a></span>
+                <span class="k">GET</span><span class="v" style="text-align:left"><a href="/api/metrics">/api/metrics</a></span>
+                <span class="k">GET</span><span class="v" style="text-align:left"><a href="/alerts">/alerts</a></span>
+                <span class="k">GET</span><span class="v" style="text-align:left"><a href="/config">/config</a></span>
+                <span class="k">POST</span><span class="v" style="text-align:left">/trades</span>
+                <span class="k">WS</span><span class="v" style="text-align:left">/ws/alerts · /ws/trades</span>
+              </div>
+            </div></div>
+          </div>
+          <div class="card" style="margin-top:16px"><div class="hd"><h3>About</h3></div><div class="bd" style="color:var(--text-2);line-height:1.6;font-size:13px">
+            TradeWatch is a big-data trade-surveillance stack — an Apache Kafka → FastAPI speed layer for sub-10ms
+            real-time anomaly alerts, with an Apache Spark / PySpark and Hadoop (HDFS + MapReduce) scale layer for
+            backtesting and distributed detection. Seven detectors combine statistical, behavioural and machine-learning
+            methods, each alert carrying an explainable reason and severity.
+          </div></div>
+        </section>
+      </div>
+    </main>
+  </div>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-    const feed = $("feed");
-    let alertCount = 0, criticalCount = 0;
-    const MAX_ROWS = 120;
+  (function () {
+    "use strict";
+    const $ = (s, r) => (r || document).querySelector(s);
+    const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
-    function connectAlerts() {
+    // ---- palette (read from CSS so it tracks the theme) ----
+    const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const SEV = { low: "--sev-low", medium: "--sev-medium", high: "--sev-high", critical: "--sev-critical" };
+    const DET_ORDER = ["zscore","price_spike","volume_spike","velocity","spoofing","wash_trade","isolation_forest"];
+    const DET_COLOR = { zscore:"#3987e5", price_spike:"#3fb950", volume_spike:"#d6a418", velocity:"#a371f7",
+      spoofing:"#ef8a5a", wash_trade:"#e5556f", isolation_forest:"#2dd4bf" };
+    const DET_DESC = {
+      zscore: "Flags prints whose price sits many standard deviations from the rolling per-symbol mean.",
+      price_spike: "Catches abrupt tick-to-tick price gaps — fat fingers, momentum ignition.",
+      volume_spike: "Size a large multiple of the robust rolling median — block trades, fat-finger size.",
+      velocity: "Bursts of trades per symbol in a short window — quote stuffing, runaway algos.",
+      spoofing: "Heavily one-sided burst of activity — spoofing and layering signatures.",
+      wash_trade: "Same beneficial owner on both sides (self-cross) at matched price & size.",
+      isolation_forest: "Online ML scoring joint price/size/velocity features for multivariate outliers."
+    };
+
+    const NAV = [
+      { sec: "Monitor" },
+      { id: "overview", label: "Overview", icon: iGrid },
+      { id: "feed", label: "Live Feed", icon: iFeed, badge: true },
+      { id: "symbols", label: "Instruments", icon: iChart },
+      { sec: "Analyze" },
+      { id: "analytics", label: "Analytics", icon: iTrend },
+      { id: "detectors", label: "Detectors", icon: iShield },
+      { id: "perf", label: "Performance", icon: iGauge },
+      { sec: "System" },
+      { id: "rules", label: "Ruleset", icon: iSliders },
+      { id: "system", label: "System", icon: iCpu },
+    ];
+    const PAGE_META = {
+      overview: ["Overview", "Real-time surveillance at a glance"],
+      feed: ["Live Feed", "Streaming anomaly alerts & trade tape"],
+      symbols: ["Instruments", "Per-symbol market activity"],
+      analytics: ["Analytics", "Throughput, flow & alert trends"],
+      detectors: ["Detectors", "Detection method coverage & activity"],
+      perf: ["Performance", "Per-event latency & throughput"],
+      rules: ["Ruleset", "Detection thresholds in effect"],
+      system: ["System", "Engine, endpoints & about"],
+    };
+
+    const state = { metrics: null, page: "overview", alerts: [], alertTotal: 0, critTotal: 0, feedFilter: "all", config: null };
+
+    // ---------- nav ----------
+    function buildNav() {
+      const nav = $("#nav"); nav.innerHTML = "";
+      NAV.forEach((n) => {
+        if (n.sec) { const d = document.createElement("div"); d.className = "nav-sec"; d.textContent = n.sec; nav.appendChild(d); return; }
+        const el = document.createElement("div");
+        el.className = "nav-item" + (n.id === state.page ? " active" : "");
+        el.dataset.id = n.id;
+        el.innerHTML = n.icon() + `<span>${n.label}</span>` + (n.badge ? `<span class="badge" id="nav-badge" style="display:none">0</span>` : "");
+        el.onclick = () => { location.hash = n.id; };
+        nav.appendChild(el);
+      });
+    }
+    function setPage(id) {
+      if (!PAGE_META[id]) id = "overview";
+      state.page = id;
+      $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
+      $$(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.id === id));
+      $("#page-title").textContent = PAGE_META[id][0];
+      $("#page-sub").textContent = PAGE_META[id][1];
+      render();
+    }
+
+    // ---------- formatting ----------
+    const nf = new Intl.NumberFormat("en-US");
+    const fmt = (n) => nf.format(Math.round(n || 0));
+    const fmtMoney = (n) => { n = n || 0; const a = Math.abs(n);
+      if (a >= 1e9) return "$" + (n/1e9).toFixed(2) + "B"; if (a >= 1e6) return "$" + (n/1e6).toFixed(2) + "M";
+      if (a >= 1e3) return "$" + (n/1e3).toFixed(1) + "K"; return "$" + n.toFixed(0); };
+    const fmtNum = (n) => { n = +n || 0; if (n >= 1000) return n.toLocaleString("en-US",{maximumFractionDigits:2}); return n.toFixed(n < 1 ? 4 : 2); };
+    const fmtUs = (us) => us >= 1000 ? (us/1000).toFixed(2) + " ms" : Math.round(us) + " µs";
+    const fmtDur = (s) => { s = s|0; const h = (s/3600)|0, m = ((s%3600)/60)|0, ss = s%60;
+      return (h?h+"h ":"") + (m||h?m+"m ":"") + ss + "s"; };
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+    // ---------- canvas helpers ----------
+    function prep(cv, h) {
+      const dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth || cv.parentElement.clientWidth;
+      cv.width = w * dpr; cv.height = (h || cv.clientHeight || 200) * dpr;
+      const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+      return { ctx, w, h: h || cv.clientHeight || 200 };
+    }
+    function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v)));
+      const n = v/p; const m = n<=1?1:n<=2?2:n<=5?5:10; return m*p; }
+
+    function areaChart(cv, pts, color, opts) {
+      opts = opts || {}; const { ctx, w, h } = prep(cv, opts.height || 220);
+      ctx.clearRect(0,0,w,h);
+      const padL = 42, padR = 12, padT = 14, padB = 22;
+      const cw = w - padL - padR, ch = h - padT - padB;
+      const vals = pts.map(p=>p.v); const mx = niceMax(Math.max(1, ...vals));
+      const X = (i) => padL + (pts.length<=1?0:(i/(pts.length-1))*cw);
+      const Y = (v) => padT + ch - (v/mx)*ch;
+      // grid + y labels
+      ctx.strokeStyle = css("--grid"); ctx.fillStyle = css("--muted"); ctx.lineWidth = 1;
+      ctx.font = "10px " + css("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      const steps = 4;
+      for (let i=0;i<=steps;i++){ const v = mx*i/steps, y = Y(v);
+        ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+        ctx.fillText(opts.fmtY?opts.fmtY(v):fmt(v), padL-7, y); }
+      if (!pts.length) return;
+      // area
+      const grad = ctx.createLinearGradient(0,padT,0,padT+ch);
+      grad.addColorStop(0, hexA(color,.34)); grad.addColorStop(1, hexA(color,.02));
+      ctx.beginPath(); ctx.moveTo(X(0), Y(pts[0].v));
+      for (let i=1;i<pts.length;i++) ctx.lineTo(X(i), Y(pts[i].v));
+      ctx.lineTo(X(pts.length-1), padT+ch); ctx.lineTo(X(0), padT+ch); ctx.closePath();
+      ctx.fillStyle = grad; ctx.fill();
+      // line
+      ctx.beginPath(); ctx.moveTo(X(0), Y(pts[0].v));
+      for (let i=1;i<pts.length;i++) ctx.lineTo(X(i), Y(pts[i].v));
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+      // last dot
+      const lx = X(pts.length-1), ly = Y(pts[pts.length-1].v);
+      ctx.beginPath(); ctx.arc(lx,ly,3.5,0,7); ctx.fillStyle = color; ctx.fill();
+      ctx.beginPath(); ctx.arc(lx,ly,6,0,7); ctx.strokeStyle = hexA(color,.3); ctx.lineWidth = 3; ctx.stroke();
+      attachHover(cv, pts, X, Y, color, opts);
+    }
+
+    function comboChart(cv, a, b, ca, cb, opts) {
+      opts = opts || {}; const { ctx, w, h } = prep(cv, opts.height || 240);
+      ctx.clearRect(0,0,w,h);
+      const padL = 42, padR = 12, padT = 14, padB = 22, cw = w-padL-padR, ch = h-padT-padB;
+      const mx = niceMax(Math.max(1, ...a.map(p=>p.v), ...b.map(p=>p.v)));
+      const X = (i)=> padL + (a.length<=1?0:(i/(a.length-1))*cw), Y=(v)=> padT+ch-(v/mx)*ch;
+      ctx.strokeStyle = css("--grid"); ctx.fillStyle = css("--muted"); ctx.lineWidth=1;
+      ctx.font="10px "+css("--mono"); ctx.textAlign="right"; ctx.textBaseline="middle";
+      for(let i=0;i<=4;i++){const v=mx*i/4,y=Y(v);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.fillText(fmt(v),padL-7,y);}
+      [[a,ca],[b,cb]].forEach(([pts,col])=>{ if(!pts.length)return;
+        ctx.beginPath(); ctx.moveTo(X(0),Y(pts[0].v));
+        for(let i=1;i<pts.length;i++) ctx.lineTo(X(i),Y(pts[i].v));
+        ctx.strokeStyle=col; ctx.lineWidth=2; ctx.lineJoin="round"; ctx.stroke();
+        const lx=X(pts.length-1),ly=Y(pts[pts.length-1].v); ctx.beginPath();ctx.arc(lx,ly,3,0,7);ctx.fillStyle=col;ctx.fill();
+      });
+    }
+
+    function barsH(el, entries, colorFn, total) {
+      const mx = Math.max(1, ...entries.map(e=>e[1]));
+      el.innerHTML = entries.length ? entries.map(([k,v])=>{ const c = colorFn(k);
+        return `<div class="row"><span class="nm"><span class="swatch" style="display:inline-block;background:${c};margin-right:7px;vertical-align:-1px"></span>${esc(k)}</span>
+        <span class="track"><span class="fill" style="width:${(100*v/mx).toFixed(1)}%;background:${c}"></span></span>
+        <span class="ct">${fmt(v)}</span></div>`; }).join("") : `<div class="empty">No alerts yet</div>`;
+    }
+
+    function histogram(cv, buckets, opts) {
+      opts = opts || {}; const { ctx, w, h } = prep(cv, opts.height || 240);
+      ctx.clearRect(0,0,w,h);
+      const padL=42, padR=12, padT=14, padB=52, cw=w-padL-padR, ch=h-padT-padB;
+      const mx = niceMax(Math.max(1,...buckets.map(b=>b.count)));
+      ctx.strokeStyle=css("--grid"); ctx.fillStyle=css("--muted"); ctx.font="10px "+css("--mono");
+      ctx.textAlign="right"; ctx.textBaseline="middle";
+      for(let i=0;i<=4;i++){const v=mx*i/4,y=padT+ch-(v/mx)*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.fillText(fmt(v),padL-7,y);}
+      const n=buckets.length, bw=cw/n, col=css("--accent");
+      buckets.forEach((b,i)=>{ const bh=(b.count/mx)*ch, x=padL+i*bw+3, y=padT+ch-bh;
+        const g=ctx.createLinearGradient(0,y,0,y+bh); g.addColorStop(0,col); g.addColorStop(1,hexA(col,.35));
+        roundRect(ctx,x,y,bw-6,Math.max(bh,0),4); ctx.fillStyle=g; ctx.fill();
+        ctx.save(); ctx.translate(padL+i*bw+bw/2, padT+ch+8); ctx.rotate(-Math.PI/4);
+        ctx.fillStyle=css("--muted"); ctx.font="9.5px "+css("--mono"); ctx.textAlign="right"; ctx.fillText(b.label,0,0); ctx.restore();
+      });
+    }
+
+    function donut(cv, entries, colorFn) {
+      const { ctx, w, h } = prep(cv, cv.clientHeight || 180);
+      ctx.clearRect(0,0,w,h);
+      const cx=w/2, cy=h/2, r=Math.min(w,h)/2-6, ir=r*0.62;
+      const total = entries.reduce((s,e)=>s+e[1],0);
+      let a=-Math.PI/2;
+      if(!total){ ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.arc(cx,cy,ir,0,7,true); ctx.fillStyle=css("--surface-3"); ctx.fill("evenodd"); }
+      entries.forEach(([k,v])=>{ const ang=(v/total)*Math.PI*2;
+        ctx.beginPath(); ctx.arc(cx,cy,r,a,a+ang); ctx.arc(cx,cy,ir,a+ang,a,true); ctx.closePath();
+        ctx.fillStyle=colorFn(k); ctx.fill();
+        ctx.strokeStyle=css("--surface"); ctx.lineWidth=2; ctx.stroke(); a+=ang; });
+      ctx.fillStyle=css("--text"); ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 22px "+css("--sans"); ctx.fillText(fmt(total), cx, cy-4);
+      ctx.fillStyle=css("--muted"); ctx.font="10px "+css("--sans"); ctx.fillText("TOTAL", cx, cy+14);
+    }
+
+    function sparkline(values, color, w, h) {
+      w=w||120; h=h||30; const dpr=window.devicePixelRatio||1;
+      const cv=document.createElement("canvas"); cv.width=w*dpr; cv.height=h*dpr; cv.style.width=w+"px"; cv.style.height=h+"px";
+      const ctx=cv.getContext("2d"); ctx.scale(dpr,dpr);
+      if(!values || values.length<2){ return cv; }
+      const mn=Math.min(...values), mx=Math.max(...values), rng=(mx-mn)||1;
+      const X=(i)=> (i/(values.length-1))*(w-2)+1, Y=(v)=> h-2-((v-mn)/rng)*(h-4);
+      ctx.beginPath(); ctx.moveTo(X(0),Y(values[0]));
+      for(let i=1;i<values.length;i++) ctx.lineTo(X(i),Y(values[i]));
+      ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.lineJoin="round"; ctx.stroke();
+      ctx.lineTo(X(values.length-1),h); ctx.lineTo(X(0),h); ctx.closePath();
+      ctx.fillStyle=hexA(color,.14); ctx.fill();
+      return cv;
+    }
+
+    function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath();
+      ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+    function hexA(hex, a){ hex=hex.trim(); if(hex.startsWith("#")){ const n=parseInt(hex.slice(1),16);
+      const r=(n>>16)&255,g=(n>>8)&255,b=n&255; return `rgba(${r},${g},${b},${a})`; } return hex; }
+
+    // hover tooltip for area charts
+    function attachHover(cv, pts, X, Y, color, opts) {
+      let tip = cv.parentElement.querySelector(".chart-tip");
+      if(!tip){ tip=document.createElement("div"); tip.className="chart-tip"; cv.parentElement.style.position="relative"; cv.parentElement.appendChild(tip); }
+      cv.onmousemove = (e) => { const rect=cv.getBoundingClientRect(); const mx=e.clientX-rect.left;
+        let best=0,bd=1e9; for(let i=0;i<pts.length;i++){ const d=Math.abs(X(i)-mx); if(d<bd){bd=d;best=i;} }
+        const p=pts[best]; tip.style.opacity=1; tip.style.left=X(best)+"px"; tip.style.top=Y(p.v)+"px";
+        tip.innerHTML = `<span class="k">${opts.label||"value"}</span> ${opts.fmtV?opts.fmtV(p.v):fmt(p.v)}`; };
+      cv.onmouseleave = () => { tip.style.opacity=0; };
+    }
+
+    // ---------- rendering ----------
+    function render() {
+      const m = state.metrics; if (!m) return;
+      renderKPIs(m);
+      const p = state.page;
+      if (p === "overview") renderOverview(m);
+      else if (p === "analytics") renderAnalytics(m);
+      else if (p === "symbols") renderSymbols(m);
+      else if (p === "detectors") renderDetectors(m);
+      else if (p === "perf") renderPerf(m);
+      else if (p === "rules") renderRules();
+      else if (p === "system") renderSystem(m);
+    }
+
+    function kpiCard(label, value, foot, icon) {
+      return `<div class="card kpi"><div class="label">${icon||""}${label}</div>
+        <div class="value">${value}</div><div class="foot">${foot||""}</div></div>`;
+    }
+    function renderKPIs(m) {
+      const k = m.kpis;
+      $("#kpis").innerHTML = [
+        kpiCard("Trades Processed", fmt(k.total_trades), `${k.trades_per_sec}/s now`, iPulse()),
+        kpiCard("Alerts Raised", fmt(k.total_alerts), `${k.alerts_per_sec}/s now`, iFlag()),
+        kpiCard("Alert Rate", k.alert_rate_pct.toFixed(2) + "%", "of all trades", iPercent()),
+        kpiCard("Critical", fmt(m.by_severity.critical||0), "highest severity", iAlert()),
+        kpiCard("Notional Flow", fmtMoney(k.total_notional), "cumulative value", iCoins()),
+        kpiCard("Engine p99", fmtUs(m.latency.p99), "per-event latency", iGaugeMini()),
+      ].join("");
+      // header + sidebar
+      $("#hp-tps").textContent = k.trades_per_sec;
+      $("#hp-aps").textContent = k.alerts_per_sec;
+      $("#sf-source").textContent = m.source;
+      $("#sf-uptime").textContent = fmtDur(k.uptime_seconds);
+      $("#sf-p99").textContent = fmtUs(m.latency.p99);
+    }
+
+    function tsPoints(m, key) { return m.timeseries.map(d => ({ t: d.t, v: d[key] })); }
+
+    function renderOverview(m) {
+      areaChart($("#c-throughput"), tsPoints(m,"trades"), css("--accent"), { height:220, label:"trades/s" });
+      areaChart($("#c-alertrate"), tsPoints(m,"alerts"), css("--sev-high"), { height:200, label:"alerts/s" });
+      const sev = ["low","medium","high","critical"].map(s=>[s, m.by_severity[s]||0]).filter(e=>e[1]>0);
+      donut($("#c-sevdonut"), sev.length?sev:[["none",0]], (k)=> k==="none"?css("--surface-3"):css(SEV[k]));
+      $("#sev-legend").innerHTML = ["critical","high","medium","low"].map(s=>
+        `<span class="li"><span class="sw" style="background:${css(SEV[s])}"></span>${s[0].toUpperCase()+s.slice(1)} · <b style="color:var(--text)">${fmt(m.by_severity[s]||0)}</b></span>`).join("");
+      const det = DET_ORDER.map(d=>[d, m.by_detector[d]||0]).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+      barsH($("#ov-detectors"), det, (k)=>DET_COLOR[k]||css("--accent"));
+    }
+
+    function renderAnalytics(m) {
+      comboChart($("#c-combo"), tsPoints(m,"trades"), tsPoints(m,"alerts"), css("--accent"), css("--sev-high"), {height:240});
+      areaChart($("#c-notional"), tsPoints(m,"notional"), css("--accent-2"), { height:210, label:"notional", fmtY:(v)=>fmtMoney(v), fmtV:(v)=>fmtMoney(v) });
+      let cum=0; const cumPts = m.timeseries.map(d=>{ cum+=d.alerts; return {t:d.t, v:cum}; });
+      areaChart($("#c-cumalerts"), cumPts, css("--sev-high"), { height:210, label:"total alerts" });
+    }
+
+    function renderSymbols(m) {
+      $("#sym-count").textContent = `${m.symbols.length} symbols tracked`;
+      const body = $("#sym-body"); body.innerHTML = "";
+      m.symbols.forEach(s => {
+        const tr = document.createElement("tr");
+        const up = s.change_pct >= 0;
+        tr.innerHTML = `<td><span class="sym">${esc(s.symbol)}</span></td>
+          <td class="num">${fmtNum(s.last_price)}</td>
+          <td class="num ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(s.change_pct).toFixed(2)}%</td>
+          <td></td>
+          <td class="num">${fmt(s.trades)}</td>
+          <td><span style="color:var(--good)">${s.buy}</span> / <span style="color:var(--sev-critical)">${s.sell}</span></td>
+          <td class="num">${fmt(s.alerts)}</td>
+          <td class="num">${fmtMoney(s.notional)}</td>`;
+        tr.children[3].appendChild(sparkline(s.spark, up?css("--good"):css("--sev-critical"), 110, 28));
+        body.appendChild(tr);
+      });
+      if(!m.symbols.length) body.innerHTML = `<tr><td colspan="8"><div class="empty">Waiting for trades…</div></td></tr>`;
+    }
+
+    function renderDetectors(m) {
+      const det = DET_ORDER.map(d=>[d, m.by_detector[d]||0]);
+      const active = det.filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+      donut($("#c-detdonut"), active.length?active:[["none",0]], (k)=> k==="none"?css("--surface-3"):(DET_COLOR[k]||css("--accent")));
+      $("#det-legend").innerHTML = DET_ORDER.map(d=>
+        `<span class="li"><span class="sw" style="background:${DET_COLOR[d]}"></span>${d} · <b style="color:var(--text)">${fmt(m.by_detector[d]||0)}</b></span>`).join("");
+      barsH($("#det-bars"), active, (k)=>DET_COLOR[k]||css("--accent"));
+      $("#det-cards").innerHTML = DET_ORDER.map(d=>`
+        <div class="det-card"><div class="top"><span class="swatch" style="background:${DET_COLOR[d]}"></span>
+        <span class="nm">${d}</span><span class="ct">${fmt(m.by_detector[d]||0)}</span></div>
+        <p>${DET_DESC[d]}</p></div>`).join("");
+    }
+
+    function renderPerf(m) {
+      const L = m.latency;
+      $("#perf-kpis").innerHTML = [
+        kpiCard("p50 latency", fmtUs(L.p50), "median per event"),
+        kpiCard("p95 latency", fmtUs(L.p95), "tail"),
+        kpiCard("p99 latency", fmtUs(L.p99), L.p99 < 200000 ? `<span class="delta up">✓ under 200ms budget</span>` : "over budget"),
+      ].join("");
+      histogram($("#c-lat"), L.histogram, { height:240 });
+      $("#perf-kv").innerHTML = [
+        ["Samples", fmt(L.count)], ["Mean", fmtUs(L.mean)], ["Max", fmtUs(L.max)],
+        ["Trades / sec", m.kpis.trades_per_sec], ["Alerts / sec", m.kpis.alerts_per_sec],
+        ["Engine trades", fmt(m.engine.trades_processed)], ["Alerts suppressed (dedup)", fmt(m.engine.alerts_suppressed||0)],
+      ].map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join("");
+      areaChart($("#c-perftput"), tsPoints(m,"trades"), css("--accent"), { height:150, label:"trades/s" });
+    }
+
+    function renderRules() {
+      const box = $("#rules");
+      if (!state.config) { box.innerHTML = `<div class="empty">Loading ruleset…</div>`; return; }
+      const c = state.config;
+      const groups = Object.entries(c).filter(([k,v])=> v && typeof v === "object");
+      box.innerHTML = `<div class="det-card" style="grid-column:1/-1"><div class="top"><span class="nm">alert_cooldown_seconds</span>
+        <span class="ct">${c.alert_cooldown_seconds}</span></div><p>Per-(symbol, detector) dedup window that collapses an episode into one alert.</p></div>` +
+        groups.map(([g,vals])=>`<div class="det-card"><div class="top"><span class="nm">${g}</span>
+          <span class="ct" style="font-size:12px;color:${vals.enabled===false?'var(--muted)':'var(--good)'}">${vals.enabled===false?'off':'on'}</span></div>
+          <div class="kv" style="margin-top:10px;font-size:12px">${Object.entries(vals).filter(([k])=>k!=='enabled')
+            .map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join("")}</div></div>`).join("");
+    }
+
+    function renderSystem(m) {
+      $("#sys-engine").innerHTML = [
+        ["Source", m.source], ["Pipeline", m.pipeline_running ? "running" : "idle"],
+        ["Detectors", (m.engine.detectors||[]).length], ["Symbols tracked", m.kpis.symbols_tracked],
+        ["Trades processed", fmt(m.engine.trades_processed)], ["Alerts raised", fmt(m.engine.alerts_raised)],
+        ["Alerts suppressed", fmt(m.engine.alerts_suppressed||0)], ["Uptime", fmtDur(m.kpis.uptime_seconds)],
+      ].map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join("");
+    }
+
+    // ---------- live feed (WebSocket) ----------
+    function renderTape(m) {
+      if (state.page !== "feed") return;
+      const b = $("#tape-body");
+      b.innerHTML = m.tape.slice(0,40).map(t=>`<tr>
+        <td><span class="sym">${esc(t.symbol)}</span></td>
+        <td class="num">${fmtNum(t.price)}</td><td class="num">${fmtNum(t.quantity)}</td>
+        <td style="color:${t.side==='buy'?'var(--good)':'var(--sev-critical)'}">${t.side}</td>
+        <td class="num">${fmtMoney(t.notional)}</td></tr>`).join("");
+    }
+    function pushAlert(a) {
+      state.alertTotal++; if (a.severity === "critical") state.critTotal++;
+      state.alerts.unshift(a); if (state.alerts.length > 200) state.alerts.pop();
+      const badge = $("#nav-badge"); if (badge) { badge.style.display = "inline-block"; badge.textContent = state.critTotal; }
+      if (state.page === "feed") renderFeed();
+    }
+    function renderFeed() {
+      const feed = $("#feed");
+      const items = state.alerts.filter(a => state.feedFilter === "all" || a.severity === state.feedFilter);
+      $("#feed-count").textContent = `${state.alertTotal} alerts`;
+      if (!items.length) { feed.innerHTML = `<div class="empty">No ${state.feedFilter==="all"?"":state.feedFilter+" "}alerts yet…</div>`; return; }
+      feed.innerHTML = items.slice(0,120).map(a=>`<div class="feed-row">
+        <div><span class="chip ${a.severity}">${a.severity}</span></div>
+        <div><span class="sym" style="font-weight:650">${esc(a.symbol)}</span>
+          <div class="reason">${esc(a.reason)}</div>
+          <div class="meta">${a.detector} · score ${(+a.score).toFixed(2)}</div></div>
+        <div class="t">${new Date(a.timestamp).toLocaleTimeString()}</div></div>`).join("");
+    }
+
+    function connectWS() {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(`${proto}://${location.host}/ws/alerts`);
-      ws.onopen = () => { $("dot").className = "dot live"; $("conn").textContent = "live"; };
-      ws.onclose = () => { $("dot").className = "dot"; $("conn").textContent = "reconnecting…"; setTimeout(connectAlerts, 1500); };
-      ws.onmessage = (ev) => {
-        const msg = JSON.parse(ev.data);
-        if (msg.type === "alert") renderAlert(msg.data);
-      };
+      ws.onopen = () => { $("#conn-dot").className = "dot live"; $("#conn-txt").textContent = "live"; };
+      ws.onclose = () => { $("#conn-dot").className = "dot"; $("#conn-txt").textContent = "reconnecting"; setTimeout(connectWS, 1500); };
+      ws.onmessage = (e) => { try { const msg = JSON.parse(e.data); if (msg.type === "alert") pushAlert(msg.data); } catch (_) {} };
     }
 
-    function renderAlert(a) {
-      if (feed.querySelector(".empty")) feed.innerHTML = "";
-      alertCount++;
-      if (a.severity === "critical") criticalCount++;
-      const row = document.createElement("div");
-      row.className = "alert";
-      const t = new Date(a.timestamp).toLocaleTimeString();
-      row.innerHTML = `
-        <div class="sev ${a.severity}">${a.severity}</div>
-        <div>
-          <span class="sym">${a.symbol}</span>
-          <div class="reason">${escapeHtml(a.reason)}</div>
-          <div class="det">${a.detector} · score ${a.score.toFixed(2)}</div>
-        </div>
-        <div class="time">${t}</div>`;
-      feed.insertBefore(row, feed.firstChild);
-      while (feed.children.length > MAX_ROWS) feed.removeChild(feed.lastChild);
-      $("feed-count").textContent = `${alertCount} alerts`;
-      $("m-critical").textContent = criticalCount;
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-    }
-
-    async function pollStats() {
+    async function poll() {
       try {
-        const s = await (await fetch("/stats")).json();
-        $("m-trades").textContent = s.trades_processed.toLocaleString();
-        $("m-alerts").textContent = s.alerts_raised.toLocaleString();
-        $("m-symbols").textContent = s.symbols_tracked;
-        const rate = s.trades_processed ? (100 * s.alerts_raised / s.trades_processed) : 0;
-        $("m-rate").textContent = rate.toFixed(2) + "%";
-        renderBreakdown(s.alerts_by_detector || {});
-      } catch (e) { /* ignore transient errors */ }
+        const m = await (await fetch("/api/metrics?window=120")).json();
+        state.metrics = m; render(); renderTape(m);
+      } catch (_) {}
     }
+    async function loadConfig() { try { state.config = await (await fetch("/config")).json(); if (state.page==="rules") renderRules(); } catch (_) {} }
 
-    function renderBreakdown(byDet) {
-      const entries = Object.entries(byDet).filter(([k]) => !k.includes(":error")).sort((a, b) => b[1] - a[1]);
-      const bd = $("breakdown");
-      if (!entries.length) { bd.innerHTML = '<div class="empty">No data yet</div>'; return; }
-      const max = Math.max(...entries.map((e) => e[1]));
-      bd.innerHTML = entries.map(([name, count]) => `
-        <div class="bar-row">
-          <span class="name">${name}</span>
-          <span class="bar-track"><span class="bar-fill" style="width:${(100 * count / max).toFixed(1)}%"></span></span>
-          <span class="count">${count}</span>
-        </div>`).join("");
-    }
+    // ---------- icons ----------
+    function svg(p){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`; }
+    function iGrid(){return svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>');}
+    function iFeed(){return svg('<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/>');}
+    function iChart(){return svg('<path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/>');}
+    function iTrend(){return svg('<path d="M3 17l6-6 4 4 7-8"/><path d="M17 7h4v4"/>');}
+    function iShield(){return svg('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>');}
+    function iGauge(){return svg('<path d="M12 13l4-4"/><path d="M3 12a9 9 0 1 1 18 0"/>');}
+    function iSliders(){return svg('<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/>');}
+    function iCpu(){return svg('<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>');}
+    function iPulse(){return svg('<path d="M3 12h4l2-6 4 12 2-6h6"/>');}
+    function iFlag(){return svg('<path d="M4 21V4h13l-2 4 2 4H4"/>');}
+    function iPercent(){return svg('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>');}
+    function iAlert(){return svg('<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.3L2 18a1.5 1.5 0 0 0 1.3 2.3h17.4A1.5 1.5 0 0 0 22 18L13.7 3.3a2 2 0 0 0-3.4 0z"/>');}
+    function iCoins(){return svg('<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v6c0 1.7 2.7 3 6 3s6-1.3 6-3"/><ellipse cx="15" cy="14" rx="6" ry="3"/>');}
+    function iGaugeMini(){return iGauge();}
 
-    connectAlerts();
-    pollStats();
-    setInterval(pollStats, 2000);
+    // ---------- init ----------
+    $("#theme-btn").onclick = () => {
+      const cur = document.documentElement.getAttribute("data-theme");
+      document.documentElement.setAttribute("data-theme", cur === "light" ? "dark" : "light");
+      render();
+    };
+    $$("#feed-filters button").forEach(b => b.onclick = () => {
+      state.feedFilter = b.dataset.sev; $$("#feed-filters button").forEach(x=>x.classList.toggle("on", x===b)); renderFeed();
+    });
+    window.addEventListener("hashchange", () => setPage(location.hash.slice(1)));
+    window.addEventListener("resize", () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
+    setInterval(() => { $("#hp-clock").textContent = new Date().toLocaleTimeString(); }, 1000);
+
+    buildNav();
+    setPage(location.hash.slice(1) || "overview");
+    connectWS(); loadConfig(); poll();
+    setInterval(poll, 1500);
+  })();
   </script>
 </body>
 </html>

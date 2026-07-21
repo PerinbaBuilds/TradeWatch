@@ -12,7 +12,7 @@
   <img alt="Apache Hadoop" src="https://img.shields.io/badge/data%20lake-Hadoop%20HDFS%20%2F%20MapReduce-66CCFF">
   <img alt="scikit-learn" src="https://img.shields.io/badge/ML-scikit--learn-F7931E">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-39%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-44%20passing-brightgreen">
 </p>
 
 <p align="center">
@@ -62,7 +62,7 @@ The detection core is embeddable too — drop it in any Python process.
 - 🔶 **Apache Spark / PySpark scale layer** — the same rules as Spark SQL window functions: a **batch backtest** over historical Parquet and a **Structured Streaming** Kafka job.
 - 🔵 **Hadoop big-data layer** — **HDFS** as the data lake and a **MapReduce** (Streaming) job for massive batch anomaly scans; the mapper/reducer are CI-tested via the same pipe Hadoop runs.
 - 🔌 **Integrate anywhere** — REST (`POST /trades`), WebSocket stream, embedded Python API, or a Kafka consumer.
-- 📊 **Live dashboard** — zero-dependency WebSocket UI, served by the app itself.
+- 📊 **Multi-page analytics console** — 8-page real-time surveillance dashboard (Overview, Live Feed, Instruments, Analytics, Detectors, Performance, Ruleset, System) with custom canvas charts, per-symbol sparklines, latency histograms and light/dark themes — zero external JS, served by the app itself.
 - 🧪 **Measured, not hand-wavy** — a labelled simulator + `tradewatch evaluate` / `tradewatch bench` give you precision/recall/F1 and latency as CI gates.
 - 🐳 **Ship it** — Dockerfile, docker-compose (with a Kafka profile), GitHub Actions CI, tunable YAML ruleset, 12-factor config.
 
@@ -363,9 +363,10 @@ See [`examples/`](examples/) for runnable scripts.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | Live dashboard |
+| `GET` | `/` | Multi-page analytics console |
 | `GET` | `/health` | Liveness / readiness |
 | `GET` | `/stats` | Engine + pipeline metrics |
+| `GET` | `/api/metrics?window=N` | Consolidated dashboard snapshot (KPIs, time-series, latency, per-symbol) |
 | `GET` | `/config` | Effective detection ruleset |
 | `GET` | `/alerts?limit=N` | Recent alerts (ring buffer) |
 | `POST` | `/trades` | Ingest one trade → alerts |
@@ -419,7 +420,7 @@ TRADEWATCH_SIMULATOR_TRADES_PER_SECOND=25
 
 ```bash
 make dev       # install with dev + kafka + spark extras
-make test      # pytest (39 tests)
+make test      # pytest (44 tests)
 make lint      # ruff
 make evaluate  # precision/recall report
 make run       # serve the dashboard
