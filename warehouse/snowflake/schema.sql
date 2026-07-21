@@ -1,0 +1,51 @@
+-- TradeWatch — Snowflake cloud data warehouse schema.
+--
+-- The gold layer: curated trades and anomalies loaded from the lake for BI,
+-- ad-hoc analytics and long-term retention. Run once to provision.
+
+CREATE WAREHOUSE IF NOT EXISTS TRADEWATCH_WH
+  WAREHOUSE_SIZE = 'XSMALL' AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE;
+
+CREATE DATABASE IF NOT EXISTS TRADEWATCH;
+CREATE SCHEMA   IF NOT EXISTS TRADEWATCH.GOLD;
+
+USE SCHEMA TRADEWATCH.GOLD;
+
+CREATE TABLE IF NOT EXISTS TRADES (
+  TRADE_ID        STRING,
+  EVENT_TS        TIMESTAMP_NTZ,
+  SYMBOL          STRING,
+  PRICE           FLOAT,
+  QUANTITY        FLOAT,
+  SIDE            STRING,
+  VENUE           STRING,
+  NOTIONAL        FLOAT,
+  DT              DATE
+)
+CLUSTER BY (DT, SYMBOL);
+
+CREATE TABLE IF NOT EXISTS ANOMALIES (
+  EVENT_TS   TIMESTAMP_NTZ,
+  SYMBOL     STRING,
+  DETECTOR   STRING,
+  SEVERITY   STRING,
+  PRICE      FLOAT,
+  QUANTITY   FLOAT,
+  SCORE      FLOAT,
+  REASON     STRING,
+  DT         DATE
+)
+CLUSTER BY (DT, SYMBOL);
+
+-- A file format + stage for loading the Spark-produced Parquet from cloud storage.
+CREATE FILE FORMAT IF NOT EXISTS PARQUET_FMT TYPE = PARQUET;
+-- CREATE STAGE IF NOT EXISTS ANOMALY_STAGE
+--   URL = 's3://your-bucket/tradewatch/anomalies/'
+--   STORAGE_INTEGRATION = TRADEWATCH_S3
+--   FILE_FORMAT = PARQUET_FMT;
+
+-- Analyst view: daily severity breakdown.
+CREATE OR REPLACE VIEW V_DAILY_SEVERITY AS
+SELECT DT, SEVERITY, COUNT(*) AS ALERTS
+FROM ANOMALIES
+GROUP BY DT, SEVERITY;

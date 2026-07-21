@@ -127,5 +127,17 @@ class Settings(BaseSettings):
     kafka_group_id: str = "tradewatch"
     kafka_auto_offset_reset: str = "latest"
 
+    # --- Security & observability ---
+    api_key: str | None = None            # if set, POST /trades requires X-API-Key
+    rate_limit_per_min: int = 600         # per-client cap on POST /trades (0 = off)
+    cors_origins: str = ""                # comma-separated allowlist ("" = none)
+    log_json: bool = False                # structured JSON logs
+    log_level: str = "INFO"
+    audit_log_path: str | None = None     # JSONL audit trail (None = stderr)
+    guardrails_enabled: bool = True
+
     def symbol_list(self) -> list[str]:
         return [s.strip().upper() for s in self.simulator_symbols.split(",") if s.strip()]
+
+    def cors_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

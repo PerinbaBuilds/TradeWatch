@@ -1,0 +1,34 @@
+{
+  "name": "tradewatch-batch-anomaly-detection",
+  "schedule": {
+    "quartz_cron_expression": "0 0 2 * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "UNPAUSED"
+  },
+  "job_clusters": [
+    {
+      "job_cluster_key": "tradewatch",
+      "new_cluster": {
+        "spark_version": "14.3.x-scala2.12",
+        "node_type_id": "Standard_DS3_v2",
+        "num_workers": 2,
+        "spark_conf": { "spark.databricks.delta.optimizeWrite.enabled": "true" }
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "task_key": "batch_detection",
+      "job_cluster_key": "tradewatch",
+      "notebook_task": {
+        "notebook_path": "/Repos/tradewatch/databricks/tradewatch_batch_job",
+        "base_parameters": {
+          "input_path": "dbfs:/tradewatch/trades",
+          "output_path": "dbfs:/tradewatch/anomalies",
+          "price_z": "3.0",
+          "vol_ratio": "6.0"
+        }
+      }
+    }
+  ]
+}

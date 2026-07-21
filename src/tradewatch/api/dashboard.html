@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TradeWatch — Surveillance Console</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233987e5'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 18h4l2.5-8 4 15 3-9 2 5h6'/%3E%3C/g%3E%3Ccircle cx='24.5' cy='11' r='2.4' fill='%23fff'/%3E%3C/svg%3E" />
   <style>
     :root {
       color-scheme: dark;
@@ -50,9 +51,9 @@
     .app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
     aside { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
     .brand { display: flex; align-items: center; gap: 11px; padding: 18px 18px 16px; }
-    .brand .logo { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 800; font-size: 15px;
-      box-shadow: 0 4px 14px rgba(57,135,229,.4); }
+    .brand .logo { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px;
+      box-shadow: 0 4px 14px rgba(57,135,229,.35); }
+    .brand .logo svg { display: block; border-radius: 10px; }
     .brand h1 { font-size: 15px; margin: 0; letter-spacing: .2px; font-weight: 700; }
     .brand .tag { font-size: 10.5px; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; }
     nav { padding: 6px 10px; overflow-y: auto; flex: 1; }
@@ -78,6 +79,32 @@
     .pill { display: inline-flex; align-items: center; gap: 7px; background: var(--surface-2); border: 1px solid var(--border);
       padding: 6px 12px; border-radius: 20px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
     .pill b { color: var(--text); font-weight: 650; }
+    .pill .pu { color: var(--muted); font-size: 10px; margin-left: 4px; text-transform: uppercase; letter-spacing: .4px; }
+
+    /* search */
+    .search { position: relative; width: 300px; margin-left: 22px; }
+    .search > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
+    .search input { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 9px 12px 9px 34px; color: var(--text); font-size: 13px; outline: none; font-family: var(--sans); }
+    .search input:focus { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+    .search-results { position: absolute; top: 44px; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; z-index: 40; display: none; }
+    .search-results.show { display: block; }
+    .search-results .res { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; font-size: 13px; }
+    .search-results .res:hover, .search-results .res.sel { background: var(--surface-2); }
+    .search-results .res .rs { font-family: var(--mono); font-weight: 650; color: var(--text); }
+    .search-results .res .rp { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-2); }
+    .search-results .none { padding: 12px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 1180px){ .search { width: 190px; } }
+
+    /* drill-down */
+    .dd-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+    .dd-head .sym { font-size: 30px; font-weight: 750; font-family: var(--mono); letter-spacing: -.5px; }
+    .dd-head .price { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .dd-head .chg { font-size: 15px; font-weight: 650; padding: 4px 10px; border-radius: 8px; }
+    .dd-back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); cursor: pointer; font-size: 13px;
+      border: 1px solid var(--border); background: var(--surface-2); padding: 7px 12px; border-radius: 9px; }
+    .dd-back:hover { color: var(--text); }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
     .dot.live { background: var(--good); box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 22%, transparent); animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
@@ -181,7 +208,22 @@
   <div class="app">
     <aside>
       <div class="brand">
-        <div class="logo">TW</div>
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="34" height="34">
+            <defs>
+              <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#3987e5"/><stop offset="1" stop-color="#7c5cff"/>
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="40" height="40" rx="10" fill="url(#lg)"/>
+            <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="20" cy="21" r="11" opacity=".28" stroke-width="1.4"/>
+              <circle cx="20" cy="21" r="6.5" opacity=".45" stroke-width="1.4"/>
+              <path d="M6 21h4l2.4-7 3.6 13 2.6-8 1.8 4H34" stroke-width="2.2"/>
+            </g>
+            <circle cx="27.5" cy="12.5" r="2.6" fill="#fff"/>
+          </svg>
+        </div>
         <div>
           <h1>TradeWatch</h1>
           <div class="tag">Surveillance Console</div>
@@ -198,10 +240,15 @@
     <main>
       <header>
         <div class="pt"><span id="page-title">Overview</span><small id="page-sub">Real-time surveillance at a glance</small></div>
+        <div class="search" id="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input id="search-input" type="text" placeholder="Search symbol…  ( / )" autocomplete="off" spellcheck="false" />
+          <div class="search-results" id="search-results"></div>
+        </div>
         <div class="spacer"></div>
         <span class="pill"><span id="conn-dot" class="dot"></span><span id="conn-txt">connecting</span></span>
-        <span class="pill">▲ <b id="hp-tps">0</b>/s trades</span>
-        <span class="pill" style="color:var(--sev-high)">⚑ <b id="hp-aps">0</b>/s alerts</span>
+        <span class="pill" title="trades per second"><b id="hp-tps">0</b><span class="pu">tps</span></span>
+        <span class="pill" style="color:var(--sev-high)" title="alerts per second"><b id="hp-aps">0</b><span class="pu">aps</span></span>
         <span class="pill" id="hp-clock" style="font-family:var(--mono)">--:--:--</span>
         <button class="icon-btn" id="theme-btn" title="Toggle theme">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -362,6 +409,30 @@
             methods, each alert carrying an explainable reason and severity.
           </div></div>
         </section>
+
+        <!-- SYMBOL DRILL-DOWN -->
+        <section class="page" id="page-symbol">
+          <div class="dd-back" id="dd-back">← Back to Instruments</div>
+          <div class="dd-head" id="dd-head" style="margin-top:16px"></div>
+          <div class="grid cols-2" style="margin-bottom:16px">
+            <div class="card chart-wrap">
+              <div class="hd"><h3>Price</h3><span class="sub" id="dd-price-sub">recent ticks</span></div>
+              <div class="bd"><canvas id="c-dd-price" height="240"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="hd"><h3>Order Flow</h3><span class="sub">buy vs sell</span></div>
+              <div class="bd" style="display:flex;gap:18px;align-items:center">
+                <canvas id="c-dd-flow" width="160" height="160" style="width:160px;flex:none"></canvas>
+                <div id="dd-flow-legend" class="legend" style="flex-direction:column"></div>
+              </div>
+            </div>
+          </div>
+          <div class="grid cols-2b" style="margin-bottom:16px" id="dd-stats"></div>
+          <div class="card">
+            <div class="hd"><h3>Alerts for this instrument</h3><span class="sub" id="dd-alert-count">—</span></div>
+            <div class="feed" id="dd-feed" style="max-height:420px"></div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -412,7 +483,7 @@
       system: ["System", "Engine, endpoints & about"],
     };
 
-    const state = { metrics: null, page: "overview", alerts: [], alertTotal: 0, critTotal: 0, feedFilter: "all", config: null };
+    const state = { metrics: null, page: "overview", symbol: null, alerts: [], alertTotal: 0, critTotal: 0, feedFilter: "all", config: null };
 
     // ---------- nav ----------
     function buildNav() {
@@ -427,13 +498,26 @@
         nav.appendChild(el);
       });
     }
+    function route() {
+      const h = location.hash.slice(1);
+      if (h.startsWith("symbol/")) { setSymbol(decodeURIComponent(h.slice(7)).toUpperCase()); return; }
+      setPage(h || "overview");
+    }
     function setPage(id) {
       if (!PAGE_META[id]) id = "overview";
-      state.page = id;
+      state.page = id; state.symbol = null;
       $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
       $$(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.id === id));
       $("#page-title").textContent = PAGE_META[id][0];
       $("#page-sub").textContent = PAGE_META[id][1];
+      render();
+    }
+    function setSymbol(sym) {
+      state.page = "symbol"; state.symbol = sym;
+      $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-symbol"));
+      $$(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.id === "symbols"));
+      $("#page-title").textContent = sym;
+      $("#page-sub").textContent = "Instrument detail";
       render();
     }
 
@@ -463,16 +547,22 @@
     function areaChart(cv, pts, color, opts) {
       opts = opts || {}; const { ctx, w, h } = prep(cv, opts.height || 220);
       ctx.clearRect(0,0,w,h);
-      const padL = 42, padR = 12, padT = 14, padB = 22;
+      const padL = opts.padL || 54, padR = 12, padT = 14, padB = 22;
       const cw = w - padL - padR, ch = h - padT - padB;
-      const vals = pts.map(p=>p.v); const mx = niceMax(Math.max(1, ...vals));
+      const vals = pts.map(p=>p.v);
+      // auto-scale: price-like series use a padded min..max band; counts use 0..niceMax
+      let lo = 0, hi = niceMax(Math.max(1, ...vals));
+      if (opts.autoScale && vals.length) {
+        const vmin = Math.min(...vals), vmax = Math.max(...vals), pad = (vmax - vmin) * 0.12 || vmax * 0.02 || 1;
+        lo = vmin - pad; hi = vmax + pad;
+      }
       const X = (i) => padL + (pts.length<=1?0:(i/(pts.length-1))*cw);
-      const Y = (v) => padT + ch - (v/mx)*ch;
+      const Y = (v) => padT + ch - ((v - lo)/(hi - lo || 1))*ch;
       // grid + y labels
       ctx.strokeStyle = css("--grid"); ctx.fillStyle = css("--muted"); ctx.lineWidth = 1;
       ctx.font = "10px " + css("--mono"); ctx.textAlign = "right"; ctx.textBaseline = "middle";
       const steps = 4;
-      for (let i=0;i<=steps;i++){ const v = mx*i/steps, y = Y(v);
+      for (let i=0;i<=steps;i++){ const v = lo + (hi-lo)*i/steps, y = Y(v);
         ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
         ctx.fillText(opts.fmtY?opts.fmtY(v):fmt(v), padL-7, y); }
       if (!pts.length) return;
@@ -497,7 +587,7 @@
     function comboChart(cv, a, b, ca, cb, opts) {
       opts = opts || {}; const { ctx, w, h } = prep(cv, opts.height || 240);
       ctx.clearRect(0,0,w,h);
-      const padL = 42, padR = 12, padT = 14, padB = 22, cw = w-padL-padR, ch = h-padT-padB;
+      const padL = 52, padR = 12, padT = 14, padB = 22, cw = w-padL-padR, ch = h-padT-padB;
       const mx = niceMax(Math.max(1, ...a.map(p=>p.v), ...b.map(p=>p.v)));
       const X = (i)=> padL + (a.length<=1?0:(i/(a.length-1))*cw), Y=(v)=> padT+ch-(v/mx)*ch;
       ctx.strokeStyle = css("--grid"); ctx.fillStyle = css("--muted"); ctx.lineWidth=1;
@@ -522,7 +612,7 @@
     function histogram(cv, buckets, opts) {
       opts = opts || {}; const { ctx, w, h } = prep(cv, opts.height || 240);
       ctx.clearRect(0,0,w,h);
-      const padL=42, padR=12, padT=14, padB=52, cw=w-padL-padR, ch=h-padT-padB;
+      const padL=54, padR=12, padT=14, padB=52, cw=w-padL-padR, ch=h-padT-padB;
       const mx = niceMax(Math.max(1,...buckets.map(b=>b.count)));
       ctx.strokeStyle=css("--grid"); ctx.fillStyle=css("--muted"); ctx.font="10px "+css("--mono");
       ctx.textAlign="right"; ctx.textBaseline="middle";
@@ -596,6 +686,44 @@
       else if (p === "perf") renderPerf(m);
       else if (p === "rules") renderRules();
       else if (p === "system") renderSystem(m);
+      else if (p === "symbol") renderSymbolDetail(m);
+    }
+
+    function renderSymbolDetail(m) {
+      const sym = state.symbol;
+      const s = m.symbols.find(x => x.symbol === sym);
+      const head = $("#dd-head");
+      if (!s) { head.innerHTML = `<div class="sym">${esc(sym||"?")}</div><div class="chg" style="background:var(--surface-3);color:var(--muted)">no data yet</div>`;
+        $("#dd-stats").innerHTML = ""; $("#dd-feed").innerHTML = `<div class="empty">Waiting for trades in ${esc(sym||"")}…</div>`;
+        $("#dd-alert-count").textContent = "—"; return; }
+      const up = s.change_pct >= 0, col = up ? css("--good") : css("--sev-critical");
+      head.innerHTML = `
+        <div class="sym">${esc(s.symbol)}</div>
+        <div class="price">${fmtNum(s.last_price)}</div>
+        <div class="chg" style="background:${hexA(col,.16)};color:${col}">${up?'▲':'▼'} ${Math.abs(s.change_pct).toFixed(2)}%</div>
+        <div style="margin-left:auto;color:var(--muted);font-size:12.5px">H ${fmtNum(s.high)} · L ${fmtNum(s.low)} · ${fmt(s.trades)} trades</div>`;
+
+      const pts = (s.spark||[]).map((v,i)=>({t:i, v}));
+      areaChart($("#c-dd-price"), pts.length?pts:[{t:0,v:s.last_price}], col, { height:240, autoScale:true, label:"price", fmtY:(v)=>fmtNum(v), fmtV:(v)=>fmtNum(v) });
+
+      donut($("#c-dd-flow"), [["buy",s.buy],["sell",s.sell]], (k)=> k==="buy"?css("--good"):css("--sev-critical"));
+      $("#dd-flow-legend").innerHTML = [["Buy",s.buy,css("--good")],["Sell",s.sell,css("--sev-critical")]]
+        .map(([n,v,c])=>`<span class="li"><span class="sw" style="background:${c}"></span>${n} · <b style="color:var(--text)">${fmt(v)}</b></span>`).join("");
+
+      $("#dd-stats").innerHTML = [
+        kpiCard("Last Price", fmtNum(s.last_price), `${up?'+':''}${s.change_pct.toFixed(2)}% session`),
+        kpiCard("Trades", fmt(s.trades), `${s.buy} buy · ${s.sell} sell`),
+        kpiCard("Alerts", fmt(s.alerts), "anomalies flagged"),
+        kpiCard("Notional", fmtMoney(s.notional), "traded value"),
+      ].join("");
+
+      const mine = state.alerts.filter(a => a.symbol === sym);
+      $("#dd-alert-count").textContent = `${mine.length} shown`;
+      $("#dd-feed").innerHTML = mine.length ? mine.slice(0,60).map(a=>`<div class="feed-row">
+        <div><span class="chip ${a.severity}">${a.severity}</span></div>
+        <div><div class="reason">${esc(a.reason)}</div><div class="meta">${a.detector} · score ${(+a.score).toFixed(2)}</div></div>
+        <div class="t">${new Date(a.timestamp).toLocaleTimeString()}</div></div>`).join("")
+        : `<div class="empty">No alerts recorded for ${esc(sym)} in this session yet.</div>`;
     }
 
     function kpiCard(label, value, foot, icon) {
@@ -655,6 +783,9 @@
           <td class="num">${fmt(s.alerts)}</td>
           <td class="num">${fmtMoney(s.notional)}</td>`;
         tr.children[3].appendChild(sparkline(s.spark, up?css("--good"):css("--sev-critical"), 110, 28));
+        tr.style.cursor = "pointer";
+        tr.title = "Open " + s.symbol;
+        tr.onclick = () => { location.hash = "symbol/" + encodeURIComponent(s.symbol); };
         body.appendChild(tr);
       });
       if(!m.symbols.length) body.innerHTML = `<tr><td colspan="8"><div class="empty">Waiting for trades…</div></td></tr>`;
@@ -782,12 +913,54 @@
     $$("#feed-filters button").forEach(b => b.onclick = () => {
       state.feedFilter = b.dataset.sev; $$("#feed-filters button").forEach(x=>x.classList.toggle("on", x===b)); renderFeed();
     });
-    window.addEventListener("hashchange", () => setPage(location.hash.slice(1)));
+    $("#dd-back").onclick = () => { location.hash = "symbols"; };
+
+    // ---------- symbol search ----------
+    const sInput = $("#search-input"), sRes = $("#search-results");
+    let selIdx = -1, matches = [];
+    function symbolUniverse() {
+      const set = new Map();
+      (state.metrics?.symbols || []).forEach(s => set.set(s.symbol, s));
+      // include configured simulator symbols even before first trade
+      return set;
+    }
+    function runSearch() {
+      const q = sInput.value.trim().toUpperCase();
+      const uni = symbolUniverse();
+      matches = [...uni.values()].filter(s => s.symbol.includes(q)).slice(0, 8);
+      if (!q) matches = [...uni.values()].slice(0, 8);
+      selIdx = -1;
+      if (!matches.length) { sRes.innerHTML = `<div class="none">No matching symbol${q?` for “${esc(q)}”`:""}</div>`; sRes.classList.add("show"); return; }
+      sRes.innerHTML = matches.map((s,i)=>{ const up = s.change_pct>=0;
+        return `<div class="res" data-i="${i}" data-sym="${esc(s.symbol)}"><span class="rs">${esc(s.symbol)}</span>
+          <span class="rp">${fmtNum(s.last_price)} <span class="${up?'up':'down'}">${up?'▲':'▼'}${Math.abs(s.change_pct).toFixed(2)}%</span></span></div>`; }).join("");
+      sRes.classList.add("show");
+      $$(".res", sRes).forEach(el => el.onclick = () => go(el.dataset.sym));
+    }
+    function go(sym) { sInput.value = ""; sRes.classList.remove("show"); sInput.blur(); location.hash = "symbol/" + encodeURIComponent(sym); }
+    sInput.addEventListener("input", runSearch);
+    sInput.addEventListener("focus", runSearch);
+    sInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { sRes.classList.remove("show"); sInput.blur(); return; }
+      if (!matches.length) return;
+      if (e.key === "ArrowDown") { selIdx = (selIdx+1)%matches.length; }
+      else if (e.key === "ArrowUp") { selIdx = (selIdx-1+matches.length)%matches.length; }
+      else if (e.key === "Enter") { go(matches[selIdx>=0?selIdx:0].symbol); return; }
+      else return;
+      e.preventDefault();
+      $$(".res", sRes).forEach((el,i)=>el.classList.toggle("sel", i===selIdx));
+    });
+    document.addEventListener("click", (e) => { if (!$("#search-box").contains(e.target)) sRes.classList.remove("show"); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "/" && document.activeElement !== sInput) { e.preventDefault(); sInput.focus(); }
+    });
+
+    window.addEventListener("hashchange", route);
     window.addEventListener("resize", () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
     setInterval(() => { $("#hp-clock").textContent = new Date().toLocaleTimeString(); }, 1000);
 
     buildNav();
-    setPage(location.hash.slice(1) || "overview");
+    route();
     connectWS(); loadConfig(); poll();
     setInterval(poll, 1500);
   })();

@@ -1,27 +1,29 @@
 # TradeWatch — Real-Time Trade Anomaly Detection Engine
 
 <p align="center">
-  <b>A big-data trade-surveillance stack: Apache Kafka → FastAPI for sub-10ms real-time anomaly alerts, with an Apache Spark, PySpark & Hadoop (HDFS + MapReduce) scale layer for distributed detection and backtesting over a data lake.</b>
+  <b>An end-to-end big-data trade-surveillance platform — Apache Kafka → FastAPI for sub-10ms real-time anomaly alerts, an Apache Spark / PySpark / Databricks + Hadoop (HDFS + MapReduce) scale layer, a Hive + Snowflake warehouse, Airflow-orchestrated ETL, hardened security, and a multi-page analytics console.</b>
 </p>
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="FastAPI" src="https://img.shields.io/badge/API-FastAPI-009688">
   <img alt="Apache Kafka" src="https://img.shields.io/badge/streaming-Apache%20Kafka-231F20">
-  <img alt="Apache Spark" src="https://img.shields.io/badge/compute-Apache%20Spark%20%2F%20PySpark-E25A1C">
-  <img alt="Apache Hadoop" src="https://img.shields.io/badge/data%20lake-Hadoop%20HDFS%20%2F%20MapReduce-66CCFF">
-  <img alt="scikit-learn" src="https://img.shields.io/badge/ML-scikit--learn-F7931E">
+  <img alt="Apache Spark" src="https://img.shields.io/badge/compute-Spark%20%2F%20PySpark%20%2F%20Databricks-E25A1C">
+  <img alt="Apache Hadoop" src="https://img.shields.io/badge/lake-Hadoop%20HDFS%20%2F%20MapReduce-66CCFF">
+  <img alt="Warehouse" src="https://img.shields.io/badge/warehouse-Hive%20%2F%20Snowflake-29B5E8">
+  <img alt="Airflow" src="https://img.shields.io/badge/orchestration-Apache%20Airflow-017CEE">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-44%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-53%20passing-brightgreen">
 </p>
 
 <p align="center">
-  <b>Big-data stack at a glance</b><br/>
-  <code>Apache Kafka</code> ➜ <code>FastAPI engine</code> &nbsp;<i>speed layer · sub-10ms/event</i><br/>
-  <code>Hadoop HDFS</code> ➜ <code>Apache Spark</code> + <code>Hadoop MapReduce</code> &nbsp;<i>scale layer · backtest &amp; distributed detection</i>
+  <b>Platform at a glance</b><br/>
+  <code>Kafka</code> ➜ <code>FastAPI engine</code> &nbsp;<i>speed layer · sub-10ms/event</i><br/>
+  <code>HDFS</code> ➜ <code>Spark / Databricks</code> + <code>Hadoop MapReduce</code> ➜ <code>Hive</code> + <code>Snowflake</code> &nbsp;<i>lakehouse + warehouse</i><br/>
+  <code>Apache Airflow</code> <i>orchestrates the daily ETL · security + audit logging throughout</i>
 </p>
 
-📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md)
+📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md) · [Data platform](docs/DATA_PLATFORM.md) · [Security](docs/SECURITY.md)
 
 ---
 
@@ -61,6 +63,8 @@ The detection core is embeddable too — drop it in any Python process.
 - 🟥 **Apache Kafka ingestion** — consume the production trade tape from a Kafka topic; a bundled producer + broker make it one command to demo end-to-end.
 - 🔶 **Apache Spark / PySpark scale layer** — the same rules as Spark SQL window functions: a **batch backtest** over historical Parquet and a **Structured Streaming** Kafka job.
 - 🔵 **Hadoop big-data layer** — **HDFS** as the data lake and a **MapReduce** (Streaming) job for massive batch anomaly scans; the mapper/reducer are CI-tested via the same pipe Hadoop runs.
+- 🏢 **Warehouse + ETL** — **Apache Hive** SQL over the lake, a **Snowflake** gold layer, a **Databricks** job, all orchestrated by an **Apache Airflow** DAG (land → Spark → MapReduce → Hive → Snowflake, with retries + a data-quality gate). See [Data platform](docs/DATA_PLATFORM.md).
+- 🔒 **Hardened & audited** — API-key auth + rate limiting + input **guardrails** on the write path, security headers/CSP, CORS allow-list, structured logging with request-ids, and an append-only **audit trail**. See [Security](docs/SECURITY.md).
 - 🔌 **Integrate anywhere** — REST (`POST /trades`), WebSocket stream, embedded Python API, or a Kafka consumer.
 - 📊 **Multi-page analytics console** — 8-page real-time surveillance dashboard (Overview, Live Feed, Instruments, Analytics, Detectors, Performance, Ruleset, System) with custom canvas charts, per-symbol sparklines, latency histograms and light/dark themes — zero external JS, served by the app itself.
 - 🧪 **Measured, not hand-wavy** — a labelled simulator + `tradewatch evaluate` / `tradewatch bench` give you precision/recall/F1 and latency as CI gates.
@@ -87,11 +91,17 @@ flowchart TB
 
     HDFS[(Hadoop HDFS<br/>data lake)]
 
-    subgraph SCALE[Batch / scale layer]
+    subgraph SCALE[Batch / scale layer — orchestrated by Apache Airflow]
         direction TB
         SS[Spark Structured Streaming<br/>windowed detection]
-        BB[Spark batch backtest<br/>Spark SQL windows]
+        BB[Spark / Databricks<br/>batch backtest]
         MR[Hadoop MapReduce<br/>Streaming mapper/reducer]
+    end
+
+    subgraph WH[Warehouse]
+        direction TB
+        HV[(Apache Hive<br/>SQL over the lake)]
+        SF[(Snowflake<br/>gold layer)]
     end
 
     KAFKA --> ENG
@@ -100,22 +110,30 @@ flowchart TB
     KAFKA -. archive .-> HDFS
     HDFS --> BB
     HDFS --> MR
+    BB & MR --> HV & SF
     BB & MR -. baselines & tuned thresholds .-> ENG
 
     API --> OUT[/Alerts: dashboard · JSONL audit · Slack / SIEM / Kafka/]
     SS --> OUT
-    BB --> HDFS
-    MR --> HDFS
+    HV & SF --> BI[Analysts / BI]
 
     classDef k fill:#231F20,stroke:#555,color:#fff;
     classDef speed fill:#0f766e,stroke:#14b8a6,color:#ecfeff;
     classDef scale fill:#E25A1C,stroke:#f59e6b,color:#fff;
     classDef lake fill:#0369a1,stroke:#38bdf8,color:#f0f9ff;
+    classDef wh fill:#164e63,stroke:#29B5E8,color:#e0f7ff;
     class KAFKA k;
     class ENG,API speed;
     class SS,BB,MR scale;
     class HDFS lake;
+    class HV,SF wh;
 ```
+
+**Security & observability** run across the whole stack: the `POST /trades`
+write path is guarded by optional API-key auth, per-client rate limiting and
+input **guardrails**; every response carries hardening headers/CSP; and an
+append-only **audit trail** plus structured, request-id-correlated logs make it
+SIEM-ready. See [Security](docs/SECURITY.md).
 
 **Pluggable by design.** A `TradeSource` produces trades; the `DetectionEngine`
 turns each trade into zero-or-more `Alert` objects; an `AlertSink` delivers them.
@@ -133,8 +151,11 @@ Forest (see [Detectors](#detectors)).
 | Ingestion | **Apache Kafka** (`aiokafka`) | Consume the production trade tape; decouple producers from detection |
 | Real-time engine | **Python 3.10+**, **scikit-learn** | Event-time windows + 7 detectors incl. online Isolation Forest |
 | Service / API | **FastAPI**, **Uvicorn**, WebSocket | REST decisioning, live streams, dashboard |
-| Distributed compute | **Apache Spark**, **PySpark** | Structured Streaming + historical backtesting with Spark SQL |
+| Distributed compute | **Apache Spark**, **PySpark**, **Databricks** | Structured Streaming + historical backtesting with Spark SQL; Databricks = managed Spark |
 | Data lake + batch | **Apache Hadoop** (HDFS + MapReduce) | Durable storage & massive batch anomaly scans (Streaming job) |
+| Warehouse | **Apache Hive**, **Snowflake** | SQL over the lake + a cloud gold layer for BI |
+| Orchestration / ETL | **Apache Airflow** | Daily batch pipeline with retries + data-quality gates |
+| Security | API-key, rate-limit, guardrails, CSP, audit log | Hardened write path + SIEM-ready audit trail |
 | Config / validation | **Pydantic v2**, YAML | Typed models, 12-factor settings, tunable rules |
 | Delivery | **Docker**, **docker-compose**, **GitHub Actions** | Containerised stacks + CI quality gates |
 
@@ -420,7 +441,7 @@ TRADEWATCH_SIMULATOR_TRADES_PER_SECOND=25
 
 ```bash
 make dev       # install with dev + kafka + spark extras
-make test      # pytest (44 tests)
+make test      # pytest (53 tests)
 make lint      # ruff
 make evaluate  # precision/recall report
 make run       # serve the dashboard
@@ -450,8 +471,16 @@ hadoop/              # Hadoop big-data layer (HDFS + MapReduce)
 ├── mapper.py        # Hadoop Streaming mapper (symbol-keyed)
 ├── reducer.py       # per-symbol z-score / volume MapReduce detection
 └── run_local.sh     # run the job with Unix pipes (no cluster needed)
+warehouse/           # SQL warehouse layer
+├── hive/schema.hql  # Hive external tables over HDFS
+└── snowflake/       # Snowflake DDL + Parquet→Snowflake loader
+databricks/          # Databricks job notebook + job spec
+airflow/dags/        # Airflow DAG orchestrating the daily ETL
 examples/            # embedded, HTTP, Kafka producer, history generator
 ```
+
+The engine itself also gained `guardrails.py`, `observability.py` and
+`api/security.py` for the hardened, audited write path.
 
 ---
 

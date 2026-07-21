@@ -25,16 +25,25 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..config import DetectionConfig, Settings
 from ..engine import DetectionEngine
+from ..guardrails import Guardrails
 from ..metrics import MetricsCollector
 from ..models import Alert, Trade
+from ..observability import AuditLogger, configure_logging
 from ..pipeline import Pipeline
 from ..sinks import Broadcaster, WebSocketSink
 from ..sources import MarketSimulator
+from .security import (
+    RateLimiter,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+    make_api_key_dependency,
+)
 
 logger = logging.getLogger("tradewatch.api")
 _DASHBOARD = Path(__file__).resolve().parent / "dashboard.html"
@@ -49,6 +58,9 @@ class AppState:
         self.engine = DetectionEngine(self.config)
         self.broadcaster = Broadcaster(history=settings.alert_buffer_size)
         self.metrics = MetricsCollector()
+        self.guardrails = Guardrails() if settings.guardrails_enabled else None
+        self.audit = AuditLogger(settings.audit_log_path)
+        self.rate_limiter = RateLimiter(settings.rate_limit_per_min)
         self.pipeline: Pipeline | None = None
         self._task: asyncio.Task | None = None
 
@@ -103,6 +115,7 @@ class AppState:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
+    configure_logging(level=settings.log_level, json_logs=settings.log_json)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -120,6 +133,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.tw = AppState(settings)
+
+    # --- security & observability middleware (outermost first) ---
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestContextMiddleware, logger=logger)
+    if settings.cors_list():
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_list(),
+            allow_methods=["GET", "POST"],
+            allow_headers=["*"],
+        )
+
+    require_api_key = make_api_key_dependency(settings.api_key, app.state.tw.audit)
 
     @app.get("/health")
     async def health() -> dict:
@@ -154,14 +180,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         snap["pipeline_running"] = bool(state.pipeline and state.pipeline.running)
         return JSONResponse(snap)
 
-    @app.post("/trades")
-    async def ingest_trade(trade: Trade) -> dict:
+    @app.post("/trades", dependencies=[Depends(require_api_key)])
+    async def ingest_trade(trade: Trade, request: Request) -> dict:
         """Ingest a single trade synchronously and return any alerts.
 
-        This is the integration entry point: any system can POST trades here
-        and receive real-time anomaly decisions in the response.
+        The integration entry point: any system can POST trades here and receive
+        real-time anomaly decisions. Guarded by optional API key, a per-client
+        rate limit, and input guardrails; every ingest/rejection is audited.
         """
         state: AppState = app.state.tw
+        client = request.client.host if request.client else "?"
+
+        if not state.rate_limiter.allow(client):
+            state.audit.record("rate_limited", outcome="denied", client=client)
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+
+        if state.guardrails is not None:
+            verdict = state.guardrails.check(trade)
+            if not verdict.ok:
+                state.audit.record(
+                    "trade_rejected", outcome="rejected", client=client,
+                    symbol=trade.symbol, reason=verdict.reason, code=verdict.code,
+                )
+                raise HTTPException(status_code=422, detail=f"guardrail: {verdict.reason}")
+
         state.broadcaster.publish_trade(trade)
         start = time.perf_counter_ns()
         raised: list[Alert] = state.engine.process(trade)
@@ -169,6 +211,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         state.metrics.record(trade, raised, latency_us)
         for alert in raised:
             state.broadcaster.publish_alert(alert)
+
+        state.audit.record(
+            "trade_ingested", trade_id=trade.trade_id, symbol=trade.symbol,
+            anomalous=bool(raised), alerts=len(raised), client=client,
+        )
         return {
             "trade_id": trade.trade_id,
             "alerts": [a.model_dump(mode="json") for a in raised],
