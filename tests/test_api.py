@@ -38,6 +38,18 @@ def test_metrics_endpoint_shape():
         assert m["source"] == "simulator"
 
 
+def test_platform_endpoint_reports_services():
+    with _client() as client:
+        p = client.get("/api/platform").json()
+        assert "summary" in p and "services" in p and "engine" in p
+        names = [s["name"] for s in p["services"]]
+        assert "TradeWatch API" in names
+        api = next(s for s in p["services"] if s["name"] == "TradeWatch API")
+        assert api["status"] == "up"
+        # cluster services aren't running in the test env → down
+        assert any(s["status"] == "down" for s in p["services"])
+
+
 def test_post_trade_returns_decision():
     with _client() as client:
         resp = client.post("/trades", json={"symbol": "AAPL", "price": 100.0, "quantity": 10.0})

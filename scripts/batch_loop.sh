@@ -26,7 +26,12 @@ while true; do
 
   echo "[batch] hadoop mapreduce…"
   bash hadoop/run_local.sh "$DATA/trades.jsonl" > "$DATA/mr_anomalies.tsv" 2>/dev/null || true
-  echo "[batch] mapreduce flagged $(wc -l < "$DATA/mr_anomalies.tsv" 2>/dev/null || echo 0) anomalies"
+  mr=$(wc -l < "$DATA/mr_anomalies.tsv" 2>/dev/null || echo 0)
+  echo "[batch] mapreduce flagged ${mr} anomalies"
+
+  # Heartbeat for the dashboard Platform health board.
+  printf '{"epoch": %s, "last_cycle": "%s", "cycle": %s, "seed": %s, "trades": %s, "mr_anomalies": %s}\n' \
+    "$(date -u +%s)" "$(date -u +%FT%TZ)" "$cycle" "$seed" "$TRADES" "$mr" > "$DATA/batch_status.json" || true
 
   # Optional: load the gold layer into Snowflake when credentials are provided.
   if [ -n "${SNOWFLAKE_ACCOUNT:-}" ]; then

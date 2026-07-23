@@ -196,6 +196,22 @@
     .kv .k { color: var(--muted); } .kv .v { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
     .rule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 14px; }
     .empty { padding: 44px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    /* platform service board */
+    .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 12px; }
+    .svc { border: 1px solid var(--border); border-radius: 11px; padding: 14px 15px; background: var(--surface-2); position: relative; }
+    .svc .r1 { display: flex; align-items: center; gap: 9px; }
+    .svc .nm { font-weight: 650; font-size: 13.5px; }
+    .svc .kind { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-left: auto; }
+    .svc .r2 { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+    .svc .stat { font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 2px 8px; border-radius: 6px; }
+    .svc .stat.up { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+    .svc .stat.down { background: color-mix(in srgb, var(--sev-critical) 18%, transparent); color: var(--sev-critical); }
+    .svc .stat.stale { background: color-mix(in srgb, var(--sev-medium) 20%, transparent); color: var(--sev-medium); }
+    .svc .hb { width: 9px; height: 9px; border-radius: 50%; }
+    .svc .hb.up { background: var(--good); box-shadow: 0 0 0 4px color-mix(in srgb,var(--good) 20%, transparent); }
+    .svc .hb.down { background: var(--sev-critical); }
+    .svc a { font-size: 11px; }
     .barlist { display: flex; flex-direction: column; gap: 11px; }
     .barlist .row { display: grid; grid-template-columns: 130px 1fr 46px; gap: 12px; align-items: center; font-size: 12.5px; }
     .barlist .nm { color: var(--text-2); font-family: var(--mono); font-size: 12px; }
@@ -386,6 +402,22 @@
             <div class="bd"><div class="rule-grid" id="rules"></div></div></div>
         </section>
 
+        <!-- PLATFORM HEALTH -->
+        <section class="page" id="page-platform">
+          <div class="grid cols-3" id="plat-summary" style="margin-bottom:16px"></div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="hd"><h3>Service Health</h3><span class="sub" id="plat-sub">probing components…</span>
+              <span class="badge r" id="plat-refresh" style="margin-left:auto;color:var(--muted);font-size:11px">—</span></div>
+            <div class="bd"><div class="svc-grid" id="plat-services"></div></div>
+          </div>
+          <div class="grid cols-2b">
+            <div class="card"><div class="hd"><h3>Batch Layer</h3><span class="sub">Spark + Hadoop MapReduce runner</span></div>
+              <div class="bd"><div class="kv" id="plat-batch"></div></div></div>
+            <div class="card"><div class="hd"><h3>Engine</h3><span class="sub">real-time speed layer</span></div>
+              <div class="bd"><div class="kv" id="plat-engine"></div></div></div>
+          </div>
+        </section>
+
         <!-- SYSTEM -->
         <section class="page" id="page-system">
           <div class="grid cols-2b">
@@ -469,6 +501,7 @@
       { id: "detectors", label: "Detectors", icon: iShield },
       { id: "perf", label: "Performance", icon: iGauge },
       { sec: "System" },
+      { id: "platform", label: "Platform", icon: iServer },
       { id: "rules", label: "Ruleset", icon: iSliders },
       { id: "system", label: "System", icon: iCpu },
     ];
@@ -479,11 +512,12 @@
       analytics: ["Analytics", "Throughput, flow & alert trends"],
       detectors: ["Detectors", "Detection method coverage & activity"],
       perf: ["Performance", "Per-event latency & throughput"],
+      platform: ["Platform", "Health & status of every stack component"],
       rules: ["Ruleset", "Detection thresholds in effect"],
       system: ["System", "Engine, endpoints & about"],
     };
 
-    const state = { metrics: null, page: "overview", symbol: null, alerts: [], alertTotal: 0, critTotal: 0, feedFilter: "all", config: null };
+    const state = { metrics: null, platform: null, page: "overview", symbol: null, alerts: [], alertTotal: 0, critTotal: 0, feedFilter: "all", config: null };
 
     // ---------- nav ----------
     function buildNav() {
@@ -687,6 +721,40 @@
       else if (p === "rules") renderRules();
       else if (p === "system") renderSystem(m);
       else if (p === "symbol") renderSymbolDetail(m);
+      else if (p === "platform") { if (state.platform) drawPlatform(); else fetchPlatform(); }
+    }
+
+    async function fetchPlatform() {
+      try { state.platform = await (await fetch("/api/platform")).json(); if (state.page === "platform") drawPlatform(); }
+      catch (_) {}
+    }
+    function drawPlatform() {
+      const d = state.platform; if (!d) return;
+      const s = d.summary;
+      $("#plat-summary").innerHTML = [
+        kpiCard("Components Up", `${s.up} / ${s.total}`, s.down ? `${s.down} down` : "all healthy", iServer()),
+        kpiCard("Batch Layer", (d.batch.status||"unknown").toUpperCase(), d.batch.last_cycle ? `cycle ${d.batch.cycle||"—"}` : "no runs yet", iGrid()),
+        kpiCard("Engine", d.engine.pipeline_running ? "RUNNING" : "IDLE", `${fmt(d.engine.trades_processed)} trades`, iPulse()),
+      ].join("");
+      $("#plat-sub").textContent = `${s.up} of ${s.total} services responding`;
+      $("#plat-refresh").textContent = "updated " + new Date(d.generated_at).toLocaleTimeString();
+      $("#plat-services").innerHTML = d.services.map(sv => `
+        <div class="svc"><div class="r1"><span class="hb ${sv.status==='up'?'up':'down'}"></span>
+          <span class="nm">${esc(sv.name)}</span><span class="kind">${esc(sv.kind)}</span></div>
+          <div class="r2"><span>${esc(sv.target)}</span>
+            <span class="stat ${sv.status}">${sv.status}${sv.status==='up'&&sv.latency_ms?` · ${sv.latency_ms}ms`:''}</span></div>
+          ${sv.url?`<div style="margin-top:8px"><a href="${sv.url}" target="_blank" rel="noopener">open ↗</a></div>`:''}
+        </div>`).join("");
+      const b = d.batch;
+      $("#plat-batch").innerHTML = (b.status === "unknown"
+        ? [["Status", "no heartbeat yet"], ["Hint", "starts with the full stack"]]
+        : [["Status", b.status], ["Last cycle", b.last_cycle||"—"], ["Cycle #", b.cycle??"—"],
+           ["Trades / cycle", b.trades??"—"], ["MapReduce anomalies", b.mr_anomalies??"—"], ["Age", (b.age_seconds??0)+"s ago"]]
+        ).map(([k,v])=>`<span class="k">${k}</span><span class="v">${esc(String(v))}</span>`).join("");
+      $("#plat-engine").innerHTML = [
+        ["Source", d.engine.source], ["Pipeline", d.engine.pipeline_running?"running":"idle"],
+        ["Trades processed", fmt(d.engine.trades_processed)], ["Alerts raised", fmt(d.engine.alerts_raised)],
+      ].map(([k,v])=>`<span class="k">${k}</span><span class="v">${esc(String(v))}</span>`).join("");
     }
 
     function renderSymbolDetail(m) {
@@ -897,6 +965,7 @@
     function iGauge(){return svg('<path d="M12 13l4-4"/><path d="M3 12a9 9 0 1 1 18 0"/>');}
     function iSliders(){return svg('<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/>');}
     function iCpu(){return svg('<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>');}
+    function iServer(){return svg('<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>');}
     function iPulse(){return svg('<path d="M3 12h4l2-6 4 12 2-6h6"/>');}
     function iFlag(){return svg('<path d="M4 21V4h13l-2 4 2 4H4"/>');}
     function iPercent(){return svg('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>');}
@@ -963,6 +1032,7 @@
     route();
     connectWS(); loadConfig(); poll();
     setInterval(poll, 1500);
+    setInterval(fetchPlatform, 5000);
   })();
   </script>
 </body>

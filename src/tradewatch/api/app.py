@@ -36,6 +36,7 @@ from ..metrics import MetricsCollector
 from ..models import Alert, Trade
 from ..observability import AuditLogger, configure_logging
 from ..pipeline import Pipeline
+from ..platform_health import PlatformMonitor
 from ..sinks import Broadcaster, WebSocketSink
 from ..sources import MarketSimulator
 from .security import (
@@ -61,6 +62,7 @@ class AppState:
         self.guardrails = Guardrails() if settings.guardrails_enabled else None
         self.audit = AuditLogger(settings.audit_log_path)
         self.rate_limiter = RateLimiter(settings.rate_limit_per_min)
+        self.platform = PlatformMonitor(settings.platform_services, settings.data_dir)
         self.pipeline: Pipeline | None = None
         self._task: asyncio.Task | None = None
 
@@ -178,6 +180,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         snap["engine"] = state.engine.stats()
         snap["source"] = state.settings.source
         snap["pipeline_running"] = bool(state.pipeline and state.pipeline.running)
+        return JSONResponse(snap)
+
+    @app.get("/api/platform")
+    async def api_platform() -> JSONResponse:
+        """Health board for every component of the platform stack."""
+        state: AppState = app.state.tw
+        snap = await state.platform.snapshot()
+        # The API itself is always up when this responds.
+        snap["services"].insert(0, {
+            "name": "TradeWatch API", "kind": "speed", "target": f"localhost:{state.settings.port}",
+            "status": "up", "latency_ms": 0.0, "url": "/",
+        })
+        snap["summary"]["total"] += 1
+        snap["summary"]["up"] += 1
+        snap["engine"] = {
+            "trades_processed": state.engine.trades_processed,
+            "alerts_raised": state.engine.alerts_raised,
+            "source": state.settings.source,
+            "pipeline_running": bool(state.pipeline and state.pipeline.running),
+        }
         return JSONResponse(snap)
 
     @app.post("/trades", dependencies=[Depends(require_api_key)])

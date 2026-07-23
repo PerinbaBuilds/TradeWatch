@@ -13,7 +13,7 @@
   <img alt="Warehouse" src="https://img.shields.io/badge/warehouse-Hive%20%2F%20Snowflake-29B5E8">
   <img alt="Airflow" src="https://img.shields.io/badge/orchestration-Apache%20Airflow-017CEE">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-53%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-54%20passing-brightgreen">
 </p>
 
 <p align="center">
@@ -66,7 +66,7 @@ The detection core is embeddable too — drop it in any Python process.
 - 🏢 **Warehouse + ETL** — **Apache Hive** SQL over the lake, a **Snowflake** gold layer, a **Databricks** job, all orchestrated by an **Apache Airflow** DAG (land → Spark → MapReduce → Hive → Snowflake, with retries + a data-quality gate). See [Data platform](docs/DATA_PLATFORM.md).
 - 🔒 **Hardened & audited** — API-key auth + rate limiting + input **guardrails** on the write path, security headers/CSP, CORS allow-list, structured logging with request-ids, and an append-only **audit trail**. See [Security](docs/SECURITY.md).
 - 🔌 **Integrate anywhere** — REST (`POST /trades`), WebSocket stream, embedded Python API, or a Kafka consumer.
-- 📊 **Multi-page analytics console** — 8-page real-time surveillance dashboard (Overview, Live Feed, Instruments, Analytics, Detectors, Performance, Ruleset, System) with custom canvas charts, per-symbol sparklines, latency histograms and light/dark themes — zero external JS, served by the app itself.
+- 📊 **Multi-page analytics console** — 9-page real-time console (Overview, Live Feed, Instruments, Analytics, Detectors, Performance, Platform health, Ruleset, System) with custom canvas charts, per-symbol sparklines, latency histograms and light/dark themes — zero external JS, served by the app itself.
 - 🧪 **Measured, not hand-wavy** — a labelled simulator + `tradewatch evaluate` / `tradewatch bench` give you precision/recall/F1 and latency as CI gates.
 - 🐳 **Ship it** — Dockerfile, docker-compose (with a Kafka profile), GitHub Actions CI, tunable YAML ruleset, 12-factor config.
 
@@ -419,6 +419,7 @@ See [`examples/`](examples/) for runnable scripts.
 | `GET` | `/health` | Liveness / readiness |
 | `GET` | `/stats` | Engine + pipeline metrics |
 | `GET` | `/api/metrics?window=N` | Consolidated dashboard snapshot (KPIs, time-series, latency, per-symbol) |
+| `GET` | `/api/platform` | Health of every stack component (Kafka, HDFS, Spark, Hive, Airflow, batch) |
 | `GET` | `/config` | Effective detection ruleset |
 | `GET` | `/alerts?limit=N` | Recent alerts (ring buffer) |
 | `POST` | `/trades` | Ingest one trade → alerts |
@@ -472,7 +473,7 @@ TRADEWATCH_SIMULATOR_TRADES_PER_SECOND=25
 
 ```bash
 make dev       # install with dev + kafka + spark extras
-make test      # pytest (53 tests)
+make test      # pytest (54 tests)
 make lint      # ruff
 make evaluate  # precision/recall report
 make run       # serve the dashboard

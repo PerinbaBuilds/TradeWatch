@@ -136,6 +136,10 @@ class Settings(BaseSettings):
     audit_log_path: str | None = None     # JSONL audit trail (None = stderr)
     guardrails_enabled: bool = True
 
+    # Platform health board: override probe targets as "Name|host|port|kind,..."
+    platform_services: str | None = None
+    data_dir: str = "/data"               # shared volume (batch heartbeat, audit)
+
     def symbol_list(self) -> list[str]:
         return [s.strip().upper() for s in self.simulator_symbols.split(",") if s.strip()]
 
