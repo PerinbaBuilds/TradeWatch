@@ -1,0 +1,201 @@
+# TradeWatch — full integrated platform, one command.
+#
+#   docker compose -f docker-compose.full.yml up --build
+#
+# Brings the whole stack up together and wired:
+#   • Kafka broker + producer            → real-time trade tape
+#   • TradeWatch API (Kafka consumer)    → engine + dashboard + security + logs
+#   • Hadoop HDFS (NameNode + DataNode)  → data lake
+#   • Spark master + worker              → distributed compute cluster
+#   • batch runner                       → recurring Spark + MapReduce jobs
+#   • Apache Hive (HiveServer2)          → SQL over the lake
+#   • Postgres + Airflow (web+scheduler) → ETL orchestration UI
+#
+# Service URLs once up:
+#   Dashboard ............ http://localhost:8000
+#   Spark master UI ...... http://localhost:8080
+#   HDFS NameNode UI ..... http://localhost:9870
+#   Airflow UI ........... http://localhost:8081   (admin / admin)
+#   HiveServer2 .......... jdbc:hive2://localhost:10000   (UI :10002)
+#
+# ⚠ Heavyweight: budget ~12 GB RAM / 6+ CPUs for Docker. To run a lighter
+#   subset, use the `kafka` / `hadoop` profiles in docker-compose.yml instead.
+#
+# Snowflake & Databricks are managed SaaS (no local container): Databricks ==
+# managed Spark (the spark-master/worker here is the runnable equivalent);
+# the Snowflake gold-layer load activates in the batch runner when
+# SNOWFLAKE_ACCOUNT/USER/PASSWORD are set in the environment.
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags:ro
+    - ./:/opt/tradewatch:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  # ---------------- Streaming: Kafka ----------------
+  kafka:
+    image: apache/kafka:3.7.0
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  producer:
+    build: .
+    image: tradewatch:latest
+    command: ["python", "examples/kafka_producer.py", "--bootstrap", "kafka:9092", "--topic", "trades", "--tps", "25"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: on-failure
+
+  # ---------------- Speed layer: TradeWatch API ----------------
+  tradewatch:
+    build: .
+    image: tradewatch:latest
+    ports: ["8000:8000"]
+    environment:
+      TRADEWATCH_SOURCE: "kafka"
+      TRADEWATCH_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      TRADEWATCH_KAFKA_TOPIC: "trades"
+      TRADEWATCH_KAFKA_AUTO_OFFSET_RESET: "earliest"
+      TRADEWATCH_LOG_JSON: "true"
+      TRADEWATCH_RATE_LIMIT_PER_MIN: "1200"
+      TRADEWATCH_AUDIT_LOG_PATH: "/data/audit.jsonl"
+    volumes:
+      - ./config:/app/config:ro
+      - shared_data:/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------- Data lake: Hadoop HDFS ----------------
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    environment:
+      CLUSTER_NAME: tradewatch
+    env_file: ["./hadoop/hadoop.env"]
+    ports: ["9870:9870", "9000:9000"]
+    volumes: ["hdfs_namenode:/hadoop/dfs/name"]
+    restart: unless-stopped
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file: ["./hadoop/hadoop.env"]
+    volumes: ["hdfs_datanode:/hadoop/dfs/data"]
+    depends_on: ["namenode"]
+    restart: unless-stopped
+
+  # ---------------- Distributed compute: Spark cluster ----------------
+  spark-master:
+    image: bitnami/spark:3.5
+    environment:
+      SPARK_MODE: master
+    ports: ["8080:8080", "7077:7077"]
+    restart: unless-stopped
+
+  spark-worker:
+    image: bitnami/spark:3.5
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 2G
+      SPARK_WORKER_CORES: 2
+    depends_on: ["spark-master"]
+    restart: unless-stopped
+
+  # ---------------- Batch/scale layer: recurring Spark + MapReduce ----------------
+  batch:
+    image: bitnami/spark:3.5
+    working_dir: /app
+    command:
+      - bash
+      - -lc
+      - "python -m venv /tmp/venv && . /tmp/venv/bin/activate && pip install -q -e '.[spark]' && bash scripts/batch_loop.sh"
+    environment:
+      BATCH_INTERVAL: "300"
+      DATA_DIR: "/data"
+    volumes:
+      - ./:/app
+      - shared_data:/data
+    depends_on: ["spark-master"]
+    restart: unless-stopped
+
+  # ---------------- Warehouse: Apache Hive ----------------
+  hive:
+    image: apache/hive:4.0.0
+    environment:
+      SERVICE_NAME: hiveserver2
+    ports: ["10000:10000", "10002:10002"]
+    restart: unless-stopped
+
+  # ---------------- Orchestration: Airflow (Postgres + web + scheduler) ----------------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes: ["airflow_db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - "airflow db migrate && airflow users create --username admin --password admin --firstname a --lastname b --role Admin --email admin@example.com || true"
+    restart: on-failure
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports: ["8081:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode:
+  airflow_db:
+  shared_data:

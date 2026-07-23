@@ -66,10 +66,17 @@ class AuditLogger:
         self._logger.setLevel(logging.INFO)
         self._logger.propagate = False
         if not self._logger.handlers:
-            if path:
-                Path(path).parent.mkdir(parents=True, exist_ok=True)
-                handler: logging.Handler = RotatingFileHandler(path, maxBytes=5_000_000, backupCount=3)
-            else:
+            handler: logging.Handler
+            try:
+                if path:
+                    Path(path).parent.mkdir(parents=True, exist_ok=True)
+                    handler = RotatingFileHandler(path, maxBytes=5_000_000, backupCount=3)
+                else:
+                    handler = logging.StreamHandler()
+            except OSError:
+                # e.g. audit path not writable (read-only volume) — fall back to
+                # stderr so auditing degrades gracefully instead of crashing boot.
+                logging.getLogger("tradewatch").warning("audit log path %s not writable; using stderr", path)
                 handler = logging.StreamHandler()
             handler.setFormatter(JsonFormatter())
             self._logger.addHandler(handler)

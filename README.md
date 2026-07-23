@@ -163,19 +163,50 @@ Forest (see [Detectors](#detectors)).
 
 ## Quickstart
 
-```bash
-# 1. install (Python 3.10+)
-pip install -e ".[dev]"
+### ▶ Run the entire platform, one command
 
-# 2. run the service + live dashboard, with the built-in market simulator
-tradewatch serve
-#   → open http://localhost:8000
+Brings up **Kafka + Hadoop HDFS + Spark cluster + Hive + Airflow + the
+TradeWatch API** (with security & logging on) and the producer — all wired
+together and running simultaneously. Needs Docker with **~12 GB RAM**.
+
+```bash
+docker compose -f docker-compose.full.yml up --build     # macOS/Linux/Windows
+#   make stack            (Make shortcut)
+#   .\scripts\run_stack.ps1   (Windows PowerShell)
 ```
 
-Or with Docker:
+Then open:
+
+| Service | URL |
+|---|---|
+| **Dashboard** (real-time console) | http://localhost:8000 |
+| Spark master UI | http://localhost:8080 |
+| HDFS NameNode UI | http://localhost:9870 |
+| Airflow (ETL orchestration) | http://localhost:8081 · `admin`/`admin` |
+| HiveServer2 | `jdbc:hive2://localhost:10000` · UI http://localhost:10002 |
+
+Data flows end-to-end: producer → Kafka → real-time engine + dashboard, while a
+**batch runner** continuously runs the Spark + Hadoop MapReduce jobs over the
+HDFS lake and Airflow hosts the ETL DAG. Stop with
+`docker compose -f docker-compose.full.yml down`.
+
+> Snowflake & Databricks are managed SaaS (no container): the Spark cluster here
+> is the runnable equivalent of Databricks, and the Snowflake gold-layer load
+> runs in the batch runner when `SNOWFLAKE_*` credentials are set.
+
+### Just the dashboard (lightweight, no Docker)
 
 ```bash
-docker compose up --build   # → http://localhost:8000
+pip install -e ".[dev]"
+tradewatch serve          # → http://localhost:8000
+```
+
+Or a lighter Docker subset:
+
+```bash
+docker compose up --build                 # API + dashboard only
+docker compose --profile kafka up --build # Kafka → FastAPI pipeline
+docker compose --profile hadoop up        # local HDFS
 ```
 
 Stream to your terminal instead:

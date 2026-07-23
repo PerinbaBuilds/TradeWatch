@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run simulate evaluate bench kafka hadoop docker clean
+.PHONY: help install dev test lint fmt run simulate evaluate bench kafka stack stack-down hadoop docker clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -13,8 +13,14 @@ dev: ## Install with dev + kafka + spark extras
 bench: ## Measure per-event latency and throughput
 	tradewatch bench
 
-kafka: ## Run the full Kafka -> FastAPI pipeline (broker + producer + consumer)
+kafka: ## Run the Kafka -> FastAPI pipeline (broker + producer + consumer)
 	docker compose --profile kafka up --build
+
+stack: ## Run the FULL integrated platform (Kafka+Hadoop+Spark+Hive+Airflow+API) — needs ~12GB RAM
+	docker compose -f docker-compose.full.yml up --build
+
+stack-down: ## Stop and remove the full platform stack
+	docker compose -f docker-compose.full.yml down
 
 hadoop: ## Run the Hadoop MapReduce job locally (generates data if needed)
 	@test -f data/trades.jsonl || python examples/generate_history.py --out data/trades.jsonl --format json --trades 100000
