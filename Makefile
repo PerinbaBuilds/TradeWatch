@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run simulate evaluate bench kafka stack stack-down hadoop docker clean
+.PHONY: help install dev test lint fmt run local simulate evaluate bench kafka stack stack-down hadoop docker clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -37,6 +37,9 @@ fmt: ## Auto-format / autofix with ruff
 
 run: ## Start the API server + dashboard (http://localhost:8000)
 	tradewatch serve
+
+local: ## Run dashboard + batch runner together, no Docker (Platform page shows batch executing)
+	bash scripts/run_local.sh
 
 simulate: ## Stream simulated trades to the console
 	tradewatch simulate --tps 30 --anomaly-rate 0.02

@@ -13,7 +13,7 @@
   <img alt="Warehouse" src="https://img.shields.io/badge/warehouse-Hive%20%2F%20Snowflake-29B5E8">
   <img alt="Airflow" src="https://img.shields.io/badge/orchestration-Apache%20Airflow-017CEE">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-54%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-56%20passing-brightgreen">
 </p>
 
 <p align="center">
@@ -193,6 +193,24 @@ HDFS lake and Airflow hosts the ETL DAG. Stop with
 > Snowflake & Databricks are managed SaaS (no container): the Spark cluster here
 > is the runnable equivalent of Databricks, and the Snowflake gold-layer load
 > runs in the batch runner when `SNOWFLAKE_*` credentials are set.
+
+### Run locally without Docker (integrated: dashboard + batch layer)
+
+No Docker? Run the console **and** the batch/scale layer together as plain
+processes — the **Platform** page shows the API up and the batch runner
+executing Spark + Hadoop MapReduce cycles:
+
+```bash
+pip install -e ".[dev,spark]"
+scripts/run_local.sh          # macOS/Linux   (or:  make local)
+.\scripts\run_local.ps1       # Windows PowerShell
+#   → http://localhost:8000   (open the "Platform" page)
+```
+
+The batch runner degrades gracefully — if Spark/Java isn't set up it skips the
+Spark step and still runs the pure-Python MapReduce each cycle. The clustered
+services (Kafka, HDFS, Hive, Airflow) need the Docker stack and honestly show
+"down" on the Platform page until you run it.
 
 ### Just the dashboard (lightweight, no Docker)
 
@@ -473,7 +491,7 @@ TRADEWATCH_SIMULATOR_TRADES_PER_SECOND=25
 
 ```bash
 make dev       # install with dev + kafka + spark extras
-make test      # pytest (54 tests)
+make test      # pytest (56 tests)
 make lint      # ruff
 make evaluate  # precision/recall report
 make run       # serve the dashboard
