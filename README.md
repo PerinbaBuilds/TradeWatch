@@ -23,7 +23,7 @@
   <code>Apache Airflow</code> <i>orchestrates the daily ETL · security + audit logging throughout</i>
 </p>
 
-📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md) · [Data platform](docs/DATA_PLATFORM.md) · [Security](docs/SECURITY.md)
+📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md) · [Data platform](docs/DATA_PLATFORM.md) · [Security](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md)
 
 ---
 
@@ -232,6 +232,22 @@ docker compose --profile hadoop up                     # local HDFS
 `scripts\run_core.ps1`) boots the streaming + lake + Spark + batch services and
 is the easiest way to see the **Platform** page go all-green;
 `docker-compose.full.yml` (~12 GB) adds Hive + Airflow.
+
+### Production deployment
+
+Deploy behind TLS with authentication, rate limiting, resource limits and an
+audit trail using the production overlay:
+
+```bash
+cp .env.docker.example .env      # set TRADEWATCH_API_KEY + DOMAIN
+docker compose -f docker-compose.core.yml -f docker-compose.prod.yml up -d --build
+#   make prod
+```
+
+This adds a **Caddy** reverse proxy with automatic HTTPS, hides the API port,
+**requires an API key**, and enables JSON logs + the audit trail. Batch runs
+from a baked image (`Dockerfile.batch`) — no runtime installs. Full guide,
+including scaling/HA notes, in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 Stream to your terminal instead:
 

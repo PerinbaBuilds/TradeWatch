@@ -17,3 +17,8 @@ docs
 build
 dist
 *.egg-info
+data
+*.parquet
+spark-warehouse
+metastore_db
+derby.log

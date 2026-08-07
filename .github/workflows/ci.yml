@@ -78,9 +78,18 @@ jobs:
           test "$(wc -l < /tmp/mr.tsv)" -gt 0
 
   docker:
-    name: Docker build
+    name: Docker build + compose validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build image
+      - name: Build API image
         run: docker build -t tradewatch:ci .
+      - name: Build batch image
+        run: docker build -f Dockerfile.batch -t tradewatch-batch:ci .
+      - name: Validate compose stacks
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.core.yml config -q
+          docker compose -f docker-compose.full.yml config -q
+          TRADEWATCH_API_KEY=ci DOMAIN=localhost \
+            docker compose -f docker-compose.core.yml -f docker-compose.prod.yml config -q

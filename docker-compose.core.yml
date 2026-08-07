@@ -102,17 +102,14 @@ services:
     restart: unless-stopped
 
   batch:
-    image: bitnami/spark:3.5
-    working_dir: /app
-    command:
-      - bash
-      - -lc
-      - "python -m venv /tmp/venv && . /tmp/venv/bin/activate && pip install -q -e '.[spark]' && bash scripts/batch_loop.sh"
+    build:
+      context: .
+      dockerfile: Dockerfile.batch
+    image: tradewatch-batch:latest
     environment:
       BATCH_INTERVAL: "180"
       DATA_DIR: "/data"
     volumes:
-      - ./:/app
       - shared_data:/data
     depends_on: ["spark-master"]
     restart: unless-stopped

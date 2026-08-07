@@ -1,0 +1,24 @@
+# Batch/scale runner image — Spark + Java + the TradeWatch package baked in.
+# Used by the `batch` service in the core/full/prod stacks so it boots fast and
+# reliably (no runtime pip install).
+FROM bitnami/spark:3.5
+
+USER root
+WORKDIR /app
+ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+COPY spark ./spark
+COPY hadoop ./hadoop
+COPY examples ./examples
+COPY scripts ./scripts
+COPY config ./config
+
+RUN pip install --no-cache-dir -e ".[spark]" && chmod +x scripts/*.sh hadoop/*.sh
+
+# Drop back to the image's non-root user.
+USER 1001
+
+ENV BATCH_INTERVAL=180 DATA_DIR=/data
+CMD ["bash", "scripts/batch_loop.sh"]

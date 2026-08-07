@@ -70,7 +70,16 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     from .api.app import create_app
 
     app = create_app(settings)
-    uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
+    # proxy_headers/forwarded_allow_ips let the app see the real scheme/client
+    # when running behind a reverse proxy (Caddy/nginx) in production.
+    uvicorn.run(
+        app,
+        host=settings.host,
+        port=settings.port,
+        log_level="info",
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )
     return 0
 
 

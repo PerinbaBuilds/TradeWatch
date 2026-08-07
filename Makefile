@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run local simulate evaluate bench kafka core stack stack-down hadoop docker clean
+.PHONY: help install dev test lint fmt run local simulate evaluate bench kafka core prod stack stack-down hadoop docker clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -18,6 +18,9 @@ kafka: ## Run the Kafka -> FastAPI pipeline (broker + producer + consumer)
 
 core: ## Run the CORE stack (Kafka+HDFS+Spark+batch+API, all live) — needs ~4-6GB RAM
 	docker compose -f docker-compose.core.yml up --build
+
+prod: ## Deploy production (core + TLS reverse proxy + auth + limits); needs .env
+	docker compose -f docker-compose.core.yml -f docker-compose.prod.yml up -d --build
 
 stack: ## Run the FULL integrated platform (Kafka+Hadoop+Spark+Hive+Airflow+API) — needs ~12GB RAM
 	docker compose -f docker-compose.full.yml up --build

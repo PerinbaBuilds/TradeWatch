@@ -1,0 +1,22 @@
+# Reverse proxy + automatic HTTPS in front of the TradeWatch API.
+# Set DOMAIN to your real hostname for a Let's Encrypt cert; defaults to
+# localhost (Caddy issues a local cert) for testing.
+{$DOMAIN:localhost} {
+	encode gzip zstd
+
+	# WebSocket (/ws/*) is upgraded automatically by Caddy.
+	reverse_proxy tradewatch:8000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
