@@ -40,6 +40,21 @@
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
+
+    /* Animated aurora backdrop — subtle, GPU-friendly, professional depth. */
+    .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .aurora::before, .aurora::after { content: ""; position: absolute; width: 60vw; height: 60vw;
+      border-radius: 50%; filter: blur(90px); opacity: .16; will-change: transform; }
+    .aurora::before { top: -18vw; left: -10vw; background: radial-gradient(circle at 30% 30%, #4f8cff, transparent 60%);
+      animation: drift1 26s ease-in-out infinite; }
+    .aurora::after { bottom: -20vw; right: -12vw; background: radial-gradient(circle at 60% 60%, #7c5cff, transparent 60%);
+      animation: drift2 32s ease-in-out infinite; }
+    :root[data-theme="light"] .aurora::before, :root[data-theme="light"] .aurora::after { opacity: .12; }
+    @keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(8vw,6vh) scale(1.15); } }
+    @keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1.05); } 50% { transform: translate(-7vw,-5vh) scale(1); } }
+    @media (prefers-reduced-motion: reduce) { .aurora::before, .aurora::after { animation: none; } }
+    .app { position: relative; z-index: 1; }
+
     body { margin: 0; background: var(--plane); color: var(--text); font-family: var(--sans);
       font-size: 14px; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
@@ -114,9 +129,17 @@
     .icon-btn svg { width: 16px; height: 16px; }
 
     .content { padding: 22px 24px 40px; overflow-y: auto; flex: 1; }
-    .page { display: none; animation: fade .25s ease; }
-    .page.active { display: block; }
+    .page { display: none; }
+    .page.active { display: block; animation: rise .4s cubic-bezier(.22,.61,.36,1); }
     @keyframes fade { from{opacity:0; transform:translateY(4px)} to{opacity:1} }
+    @keyframes rise { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+    /* premium micro-interactions */
+    .kpi, .svc, .det-card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    .kpi:hover, .svc:hover, .det-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,.22); }
+    :root[data-theme="light"] .kpi:hover, :root[data-theme="light"] .svc:hover, :root[data-theme="light"] .det-card:hover { box-shadow: 0 12px 30px rgba(15,23,42,.10); }
+    .card { transition: border-color .2s ease; }
+    .nav-item { transition: background .14s ease, color .14s ease, transform .14s ease; }
+    .nav-item:active { transform: scale(.98); }
 
     /* ---------- grid + cards ---------- */
     .grid { display: grid; gap: 16px; }
@@ -221,6 +244,7 @@
   </style>
 </head>
 <body>
+  <div class="aurora" aria-hidden="true"></div>
   <div class="app">
     <aside>
       <div class="brand">

@@ -222,10 +222,16 @@ tradewatch serve          # → http://localhost:8000
 Or a lighter Docker subset:
 
 ```bash
-docker compose up --build                 # API + dashboard only
-docker compose --profile kafka up --build # Kafka → FastAPI pipeline
-docker compose --profile hadoop up        # local HDFS
+docker compose -f docker-compose.core.yml up --build   # CORE: Kafka+HDFS+Spark+batch+API (~4-6 GB, all live)
+docker compose up --build                              # API + dashboard only
+docker compose --profile kafka up --build              # Kafka → FastAPI pipeline
+docker compose --profile hadoop up                     # local HDFS
 ```
+
+**Which stack?** — `docker-compose.core.yml` (~4-6 GB, `make core` /
+`scripts\run_core.ps1`) boots the streaming + lake + Spark + batch services and
+is the easiest way to see the **Platform** page go all-green;
+`docker-compose.full.yml` (~12 GB) adds Hive + Airflow.
 
 Stream to your terminal instead:
 
