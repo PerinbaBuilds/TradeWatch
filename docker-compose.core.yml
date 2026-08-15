@@ -88,7 +88,7 @@ services:
     image: bitnamilegacy/spark:3.5.6
     environment:
       SPARK_MODE: master
-    ports: ["8080:8080", "7077:7077"]
+    ports: ["8090:8080", "7077:7077"]   # UI on host :8090 (avoids the common :8080 clash)
     restart: unless-stopped
 
   spark-worker:

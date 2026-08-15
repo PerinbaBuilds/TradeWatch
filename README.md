@@ -233,7 +233,7 @@ docker compose -f docker-compose.full.yml up --build     # or: make stack
 | Service | URL |
 |---|---|
 | **Dashboard** | http://localhost:8000 |
-| Spark master | http://localhost:8080 |
+| Spark master | http://localhost:8090 |
 | HDFS NameNode | http://localhost:9870 |
 | Airflow | http://localhost:8081 (`admin`/`admin`) |
 
