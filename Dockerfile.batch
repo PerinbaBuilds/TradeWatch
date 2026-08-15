@@ -1,7 +1,7 @@
 # Batch/scale runner image — Spark + Java + the TradeWatch package baked in.
 # Used by the `batch` service in the core/full/prod stacks so it boots fast and
 # reliably (no runtime pip install).
-FROM bitnami/spark:3.5
+FROM bitnamilegacy/spark:3.5.6
 
 USER root
 WORKDIR /app

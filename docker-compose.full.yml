@@ -115,14 +115,14 @@ services:
 
   # ---------------- Distributed compute: Spark cluster ----------------
   spark-master:
-    image: bitnami/spark:3.5
+    image: bitnamilegacy/spark:3.5.6
     environment:
       SPARK_MODE: master
     ports: ["8080:8080", "7077:7077"]
     restart: unless-stopped
 
   spark-worker:
-    image: bitnami/spark:3.5
+    image: bitnamilegacy/spark:3.5.6
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
