@@ -6,7 +6,10 @@ ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY pyproject.toml requirements.txt README.md ./
 COPY src ./src
-RUN pip install --prefix=/install .
+# Include the [kafka] extra so the image ships the aiokafka client used by both
+# the producer (examples/kafka_producer.py) and the Kafka consumer source —
+# without it the Kafka → engine pipeline can't connect and no trades flow.
+RUN pip install --prefix=/install ".[kafka]"
 
 # ---- runtime stage ---------------------------------------------------------
 FROM python:3.11-slim AS runtime
