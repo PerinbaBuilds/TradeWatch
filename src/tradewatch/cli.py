@@ -53,6 +53,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     bench = sub.add_parser("bench", help="Measure per-event processing latency and throughput")
     bench.add_argument("--trades", type=int, default=40000)
+
+    train = sub.add_parser("train", help="Train + evaluate anomaly models (MLOps: metrics, model card, MLflow)")
+    train.add_argument("--trades", type=int, default=40000)
+    train.add_argument("--anomaly-rate", type=float, default=0.02)
+    train.add_argument("--seed", type=int, default=7)
+    train.add_argument("--test-fraction", type=float, default=0.3)
+    train.add_argument("--out", default="models")
     return p
 
 
@@ -135,6 +142,19 @@ def _cmd_bench(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_train(args: argparse.Namespace) -> int:
+    from .ml.train import train
+
+    train(
+        trades=args.trades,
+        anomaly_rate=args.anomaly_rate,
+        seed=args.seed,
+        test_fraction=args.test_fraction,
+        out_dir=args.out,
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     args = _build_parser().parse_args(argv)
@@ -146,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_evaluate(args)
     if args.command == "bench":
         return _cmd_bench(args)
+    if args.command == "train":
+        return _cmd_train(args)
     return 1
 
 

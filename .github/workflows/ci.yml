@@ -31,14 +31,17 @@ jobs:
       - name: Lint
         run: ruff check src tests spark hadoop examples scripts warehouse airflow databricks
 
-      - name: Test
-        run: pytest -q
+      - name: Test (unit, integration, property-based) + coverage
+        run: pytest -q --cov=tradewatch --cov-report=term-missing
 
       - name: Detection quality gate (precision/recall)
         run: tradewatch evaluate --trades 12000 --seed 7
 
       - name: Latency benchmark (sub-200ms gate)
         run: tradewatch bench --trades 8000
+
+      - name: Model training smoke (ROC-AUC gate)
+        run: tradewatch train --trades 8000 --seed 7 --out /tmp/models
 
   bigdata:
     name: Big-data smoke (Spark + Hadoop)

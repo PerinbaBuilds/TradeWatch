@@ -11,11 +11,16 @@ the instant they happen, with a plain-English reason attached to every alert.
   <img alt="Apache Spark" src="https://img.shields.io/badge/Apache_Spark-0D1117?style=for-the-badge&logo=apachespark&logoColor=E25A1C">
   <img alt="Apache Hadoop" src="https://img.shields.io/badge/Hadoop-0D1117?style=for-the-badge&logo=apachehadoop&logoColor=66CCFF">
   <img alt="Snowflake" src="https://img.shields.io/badge/Snowflake-0D1117?style=for-the-badge&logo=snowflake&logoColor=29B5E8">
+  <img alt="scikit-learn" src="https://img.shields.io/badge/scikit--learn-0D1117?style=for-the-badge&logo=scikitlearn&logoColor=F7931E">
+  <img alt="MLflow" src="https://img.shields.io/badge/MLflow-0D1117?style=for-the-badge&logo=mlflow&logoColor=0194E2">
+  <img alt="Prometheus" src="https://img.shields.io/badge/Prometheus-0D1117?style=for-the-badge&logo=prometheus&logoColor=E6522C">
+  <img alt="Grafana" src="https://img.shields.io/badge/Grafana-0D1117?style=for-the-badge&logo=grafana&logoColor=F46800">
+  <img alt="Jupyter" src="https://img.shields.io/badge/Jupyter-0D1117?style=for-the-badge&logo=jupyter&logoColor=F37626">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-0D1117?style=for-the-badge&logo=docker&logoColor=2496ED">
   <img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub_Actions-0D1117?style=for-the-badge&logo=githubactions&logoColor=2088FF">
 </p>
 
-📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md) · [Data platform](docs/DATA_PLATFORM.md) · [Security](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md)
+📄 Docs: [Requirements (SRS)](docs/SRS.md) · [Design (SDS)](docs/SDS.md) · [Architecture](docs/ARCHITECTURE.md) · [Data platform](docs/DATA_PLATFORM.md) · [ML & MLOps](docs/MLOPS.md) · [Testing](docs/TESTING.md) · [Security](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md)
 
 ---
 
@@ -100,8 +105,13 @@ were we on normal flow?*
 - **Multi-page analytics console** — a 9-page real-time dashboard (overview, live
   feed, per-instrument drill-down, detectors, latency, platform health) with
   custom canvas charts and zero external JS, served by the app itself.
-- **Hardened & audited** — API-key auth, rate limiting, input guardrails,
-  security headers/CSP, and an append-only audit trail on the write path.
+- **ML + MLOps layer** — leakage-safe feature engineering, offline training of
+  supervised (gradient-boosted) and unsupervised (Isolation Forest) models with
+  ROC/PR-AUC evaluation, an auto-generated model card, **MLflow** experiment
+  tracking, and an analysis notebook (`tradewatch train`).
+- **Monitored & observable** — a Prometheus `/metrics` endpoint and a ready-made
+  **Grafana** dashboard, plus API-key auth, rate limiting, input guardrails and an
+  append-only audit trail on the write path.
 - **Integrate anywhere** — REST, WebSocket stream, an embeddable Python API, or a
   Kafka consumer; ships with Docker, compose stacks and a production TLS overlay.
 
@@ -118,6 +128,9 @@ were we on normal flow?*
 | Data lake + batch | **Apache Hadoop** (HDFS + MapReduce) | Durable at-rest storage and massive batch anomaly scans |
 | Warehouse | **Apache Hive**, **Snowflake** | SQL over the lake + a cloud gold layer for BI |
 | Orchestration | **Apache Airflow** | Nightly ETL with retries and a data-quality gate |
+| ML / MLOps | **scikit-learn**, **MLflow**, **Jupyter**, **pandas** | Offline model training + evaluation, experiment tracking, analysis notebook |
+| Monitoring | **Prometheus**, **Grafana** | `/metrics` scrape endpoint + a ready-made ops dashboard |
+| Testing | **pytest**, **Hypothesis**, **coverage** | Unit, integration, property-based, statistical, load + latency gates |
 | Config / validation | **Pydantic v2**, YAML | Typed models, 12-factor settings, tunable rules without code changes |
 | Delivery | **Docker**, **docker-compose**, **GitHub Actions** | Reproducible stacks + CI quality gates (tests, precision/recall, latency) |
 
@@ -285,9 +298,22 @@ tradewatch bench                     # per-event latency (p50/p95/p99)
 tradewatch simulate --tps 30         # stream alerts to the console
 ```
 
+**Train & track models** (data-science layer — needs the `[ml]` extra):
+
+```bash
+pip install -e ".[ml]"
+tradewatch train --trades 40000      # trains + evaluates, writes a model card,
+                                     # logs the run to MLflow (models/mlflow.db)
+mlflow ui --backend-store-uri sqlite:///models/mlflow.db   # inspect runs
+jupyter lab notebooks/anomaly_analysis.ipynb               # EDA + ROC/PR curves
+```
+
+See **[docs/MLOPS.md](docs/MLOPS.md)** for the ML/MLOps + monitoring guide and
+**[docs/TESTING.md](docs/TESTING.md)** for the full testing strategy.
+
 **Key HTTP endpoints:** `GET /` (console) · `GET /health` · `GET /stats` ·
-`GET /api/metrics?window=N` · `GET /api/platform` (per-component health) ·
-`GET /alerts?limit=N` · `POST /trades`.
+`GET /metrics` (Prometheus) · `GET /api/metrics?window=N` ·
+`GET /api/platform` (per-component health) · `GET /alerts?limit=N` · `POST /trades`.
 
 **Tune detection** without touching code — thresholds live in
 [`config/detection_rules.yaml`](config/detection_rules.yaml); service settings are

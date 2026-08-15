@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint fmt run local simulate evaluate bench kafka core prod stack stack-down hadoop docker clean
+.PHONY: help install dev test lint fmt run local simulate evaluate bench train loadtest kafka core prod stack stack-down hadoop docker clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -53,6 +53,12 @@ simulate: ## Stream simulated trades to the console
 
 evaluate: ## Measure detection precision/recall on labelled data
 	tradewatch evaluate --trades 15000
+
+train: ## Train + evaluate anomaly models (MLOps: metrics, model card, MLflow)
+	tradewatch train --trades 40000
+
+loadtest: ## Load/stress-test a running API (start `make run` first)
+	python scripts/loadtest.py --requests 8000 --concurrency 32
 
 docker: ## Build and run the container
 	docker compose up --build

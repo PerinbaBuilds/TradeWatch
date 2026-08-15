@@ -1,0 +1,14 @@
+# Prometheus scrape config for TradeWatch.
+#   docker run -p 9090:9090 -v $PWD/deploy/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+# then point Grafana at http://localhost:9090 and import deploy/grafana/tradewatch-dashboard.json
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: tradewatch
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["tradewatch:8000"]   # use host.docker.internal:8000 if running locally
+        labels:
+          service: tradewatch

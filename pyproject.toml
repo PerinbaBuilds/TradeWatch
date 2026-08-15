@@ -31,9 +31,20 @@ dependencies = [
 kafka = ["aiokafka>=0.10"]
 spark = ["pyspark>=3.5", "pyarrow>=14", "pandas>=2.0"]
 snowflake = ["snowflake-connector-python>=3.6", "pandas>=2.0", "pyarrow>=14"]
+# Offline data-science / MLOps layer: feature engineering, model training,
+# experiment tracking and analysis notebooks.
+ml = [
+  "joblib>=1.3",
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+  "mlflow>=2.9",
+]
 dev = [
   "pytest>=7.4",
   "pytest-asyncio>=0.23",
+  "pytest-cov>=4.1",
+  "hypothesis>=6.90",
   "httpx>=0.26",
   "ruff>=0.3",
 ]

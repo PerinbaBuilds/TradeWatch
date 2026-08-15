@@ -27,7 +27,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from ..config import DetectionConfig, Settings
 from ..engine import DetectionEngine
@@ -181,6 +181,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         snap["source"] = state.settings.source
         snap["pipeline_running"] = bool(state.pipeline and state.pipeline.running)
         return JSONResponse(snap)
+
+    @app.get("/metrics", response_class=PlainTextResponse)
+    async def prometheus_metrics() -> PlainTextResponse:
+        """Prometheus scrape endpoint (text exposition format)."""
+        from ..prometheus import render
+
+        state: AppState = app.state.tw
+        body = render(
+            state.metrics,
+            state.engine.stats(),
+            bool(state.pipeline and state.pipeline.running),
+        )
+        return PlainTextResponse(body, media_type="text/plain; version=0.0.4; charset=utf-8")
 
     @app.get("/api/platform")
     async def api_platform() -> JSONResponse:

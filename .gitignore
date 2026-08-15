@@ -33,3 +33,10 @@ derby.log
 .vscode/
 .idea/
 .DS_Store
+
+# ML / MLOps training artifacts
+models/
+mlruns/
+mlflow.db
+*.joblib
+.ipynb_checkpoints/

@@ -1,0 +1,77 @@
+{
+  "title": "TradeWatch — Real-Time Surveillance",
+  "uid": "tradewatch-main",
+  "schemaVersion": 39,
+  "editable": true,
+  "tags": ["tradewatch", "fintech", "anomaly-detection"],
+  "timezone": "browser",
+  "time": {"from": "now-15m", "to": "now"},
+  "refresh": "5s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {"text": "Prometheus", "value": "Prometheus"}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Trades / sec",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [{"expr": "tradewatch_trades_per_second"}]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Alert rate (%)",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [{"expr": "tradewatch_alert_rate_pct"}]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Symbols tracked",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [{"expr": "tradewatch_symbols_tracked"}]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Pipeline up",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [{"expr": "tradewatch_pipeline_running"}]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Trade & alert throughput",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [
+        {"expr": "rate(tradewatch_trades_total[1m])", "legendFormat": "trades/s"},
+        {"expr": "rate(tradewatch_alerts_total[1m])", "legendFormat": "alerts/s"}
+      ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Processing latency (µs) by quantile",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [
+        {"expr": "tradewatch_latency_microseconds{quantile=\"0.5\"}", "legendFormat": "p50"},
+        {"expr": "tradewatch_latency_microseconds{quantile=\"0.95\"}", "legendFormat": "p95"},
+        {"expr": "tradewatch_latency_microseconds{quantile=\"0.99\"}", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "id": 7, "type": "piechart", "title": "Alerts by detector",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [{"expr": "tradewatch_alerts_by_detector_total", "legendFormat": "{{detector}}"}]
+    },
+    {
+      "id": 8, "type": "bargauge", "title": "Alerts by severity",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "targets": [{"expr": "tradewatch_alerts_by_severity_total", "legendFormat": "{{severity}}"}]
+    }
+  ]
+}
